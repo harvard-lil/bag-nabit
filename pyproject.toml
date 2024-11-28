@@ -1,0 +1,20 @@
+[project]
+name = "nabit"
+version = "0.1.0"
+description = "Archive and sign datasets"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1.0",
+    "warcio>=1.7.4",
+    "requests>=2.32.3",
+    "bagit>=1.8.1",
+    "setuptools>=75.6.0",
+]
+
+[project.scripts]
+nabit = "nabit.bin.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
