@@ -74,14 +74,18 @@ def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> No
 
 def verify_timestamp(timestamp_file: Path, file_to_verify: Path, pem_file: Path) -> None:
     """Verify a timestamp for a file."""
-    args = [
+    # first verify the timestamp certificate is trusted by this system
+    # note: this will fail if a bag is timestamped by a root CA later taken out of service
+    run_openssl(['verify', pem_file])
+
+    # now verify the timestamp response with the valid timestamp certificate
+    return run_openssl([
         "ts",
         "-verify",
         "-data", file_to_verify,
         "-in", timestamp_file,
         "-CAfile", pem_file,
-    ]
-    return run_openssl(args)
+    ])
 
 def sign(file_path: str, output_path: str, key: str, cert_chain: str) -> None:
     """Create a detached signature with full chain in PEM format."""
