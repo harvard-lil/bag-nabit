@@ -1,14 +1,15 @@
 bag-nabit
 =========
 
-`bag-nabit` is a tool for downloading and attaching provenance to public datasets.
+`bag-nabit` is a tool for downloading and attaching provenance information to public datasets.
 The tool is intended for library projects that back up public domain resources and share
 them with patrons.
 
-`bag-nabit` writes a bagit package from either local files or remote URLs, and can also:
+`bag-nabit` writes a BagIt package from either local files or remote URLs, and can also:
 
 * Store request and response headers in a headers.warc file.
 * Attach timestamps and public-key signatures to the bag's tagmanifest file.
+* Verify format compliance and provenance chains on an existing bag-nabit bag.
 
 Installation
 ------------
@@ -31,7 +32,7 @@ Quick start
 Create a bag from a single URL:
 
 ```
-nabit archive -u https://example.com/ -o example_bag
+nabit archive example_bag -u https://example.com/
 ```
 
 Create a bag from multiple URLs, files, and directories:
@@ -75,7 +76,7 @@ File format
 
 `bag-nabit` reads and writes a special dialect of [BagIt](https://en.wikipedia.org/wiki/BagIt) designed for attaching provenance to publicly hosted resources.
 
-`nabit`-flavored bags have the following notable features:
+`bag-nabit`-flavored bags have the following notable features:
 
 * headers.warc records provenance information for files downloaded from the web.
 * signatures/ contains a chain of signature files and timestamp files for the tagmanifest.
@@ -87,12 +88,12 @@ The layout of a `bag-nabit` bag is as follows:
 * `bag-info.txt`: standard BagIt file
 * `manifest-sha256.txt`: standard BagIt file
 * `tagmanifest-sha256.txt`: standard BagIt file
-* `unsigned-metadata.json`: optional, metadata not signed, editable after bag is created
+* `unsigned-metadata.json`: optional metadata, not signed, editable after bag is created
 * `data/`
   * `files/`: directory of files added to the bag
     * `...`
   * `headers.warc`: optional, request and response headers from HTTP fetches for files in `files/`
-  * `signed-metadata.json`: optional, metadata signed with the bag
+  * `signed-metadata.json`: optional metadata, signed along with the bag contents
 * `signatures/`: directory of signature files
   * `tagmanifest-sha256.txt.p7s` -- signature file for `tagmanifest-sha256.txt`
   * `tagmanifest-sha256.txt.p7s.tsr` -- timestamp file for `tagmanifest-sha256.txt.p7s`
