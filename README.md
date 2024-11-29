@@ -30,8 +30,8 @@ Design goals are:
 * Like any other BagIt file, users should be able to read metadata as a text file and directly access the underlying data.
 * Like WARC, users should be able to access request and response headers for the original source of data.
   However, unlike WARC, downloaded payloads should be directly accessible as files rather than embedded in a container format.
-* Like C2PA and wacz-auth, bags should include certificate chains showing who (based on control of a domain or email address
-  at a particular time) vouches for the integrity of the dataset.
+* Like C2PA and wacz-auth, bags should include certificate chains showing who (based on control of a private key) vouches for the integrity of the dataset.
+* Bags should be easy to copy and back up in different archives. This means vouching should continue to work after a particular host (such as a library) goes offline. We therefore rely on the existing PKI infrastructure (such as email, domain, and document signing certificates) to establish the identity of the signer.
 
 Installation
 ------------
@@ -156,6 +156,43 @@ Options:
 
 <!-- usage end -->
 
+Usage tips
+----------
+
+### Manual bag creation and editing
+
+After creating a bag, or obtaining a bag from another source, the bag can be edited manually --
+for example, by adding files to the data/ directory or editing a metadata file. However, new
+data files or edits to signed files will invalidate the signature, causing `nabit validate` to fail.
+
+To re-sign a bag after editing, use the `--amend` flag to `nabit archive`:
+
+```
+nabit archive example_bag --amend -s mykey.pem:mychain.pem -t digicert
+```
+
+This command will regenerate the manifest files, remove any signatures and timestamps that no
+longer validate, and then re-run the signing and timestamping process.
+
+### Key management: create-and-sign workflows
+
+Bags can be signed with any key accepted by `openssl cms`, such as domain keys, email keys, or
+document signing keys. Protecting these keys is very important, as losing them will not only
+allow an attacker to create fake bags, but also to publish fake websites, email, or whatever
+other purpose the key serves.
+
+In many situations it may make sense to create and sign bags on different machines or by different people. A typical workflow might be:
+
+* A worker machine or trusted volunteer creates the bag and timestamps it, but does not sign it:
+  ```
+  nabit archive example_bag -u https://example.com/ -t digicert
+  ```
+* The data is transferred to a high security machine where a signature and a second timestamp is added:
+  ```
+  nabit archive example_bag --amend -s mykey.pem:mychain.pem -t digicert
+  ```
+* The signed bag is then published to the archive, perhaps simply by copying the bag directory to a public file server.
+
 File format
 -----------
 
@@ -209,14 +246,27 @@ Signing the tagmanifest file is sufficient to ensure the integrity of the bag, a
 cryptographic hashes for all tag files, including the manifest file which contains hashes for all data files.
 
 The signatures directory can contain two kinds of attestation files:
-
 * `.p7s` files are PKCS#7 signature files, which assert a domain or email address vouching for the bag contents.
-  * `.p7s` files are created with the command `openssl cms -sign -binary -in <original_file> -out <signature_file> -inkey <key_file> -signer <cert_chain> -certfile <cert_chain> -outform PEM`.
-  * `.p7s` files can be validated with the command `openssl cms -verify -binary -content <original_file> -in <signature_file> -inform PEM -purpose any`.
+  * `.p7s` files are created with the command:
+    ```
+    openssl cms -sign -binary -in <original_file> -out <signature_file> -inkey <key_file> -signer <cert_chain> -certfile <cert_chain> -outform PEM
+    ```
+  * `.p7s` files can be validated with the command:
+    ```
+    openssl cms -verify -binary -content <original_file> -in <signature_file> -inform PEM -purpose any
+    ```
 * `.tsr` files are timestamp response files, which assert a time before which the bag was created.
-  * `.tsr` files are created with the command `openssl ts -query -data <original_file> -no_nonce -sha256 -cert` to generate the request, which is then sent to a timestamping authority.
-  * `.tsr` files can be validated with the command `openssl ts -verify -data <original_file> -in <timestamp_file> -CAfile <certificate_file>`.
-  * The timestamping authority is expected to be the same one that created the `.tsr.crt` file, which is a copy of the timestamping authority's certificate.
+  * `.tsr` files are created with the command:
+    ```
+    openssl ts -query -data <original_file> -no_nonce -sha256 -cert
+    ```
+  * `.tsr` files can be validated with the commands:
+    ```
+    # verify certificate chain
+    openssl verify <certificate_file>
+    # validate timestamp
+    openssl ts -verify -data <original_file> -in <timestamp_file> -CAfile <certificate_file>
+    ```
   
 To allow creation of arbitrary certificate chains, each attestation includes the full file name of the file it attests to.
 For example, this layout:
@@ -260,22 +310,6 @@ but the provided filenames are encouraged to ensure that users will understand t
 
 `bag-nabit` does not currently specify anything regarding the
 contents of the metadata files.
-
-Manual bag creation and editing
--------------------------------
-
-After creating a bag, or obtaining a bag from another source, the bag can be edited manually --
-for example, by adding files to the data/ directory or editing a metadata file. However, new
-data files or edits to signed files will invalidate the signature, causing `nabit validate` to fail.
-
-To re-sign a bag after editing, use the `--amend` flag to `nabit archive`:
-
-```
-nabit archive example_bag --amend -s mykey.pem:mychain.pem -t digicert
-```
-
-This command will regenerate the manifest files, remove any signatures and timestamps that no
-longer validate, and then re-run the signing and timestamping process.
 
 Limitations and Caveats
 -----------------------
