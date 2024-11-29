@@ -71,6 +71,62 @@ Validate a bag's contents:
 nabit validate example_bag
 ```
 
+Command line usage
+------------------
+<!-- usage start -->```
+Usage:  [OPTIONS] COMMAND [ARGS]...
+
+  BagIt package signing tool
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  archive   Archive files and URLs into a BagIt package.
+  validate  Validate a BagIt package.
+```
+
+### archive
+```
+Usage:  [OPTIONS] BAG_PATH
+
+  Archive files and URLs into a BagIt package. bag_path is the destination
+  directory for the package.
+
+Options:
+  -a, --amend                     Update an existing archive. May add OR
+                                  OVERWRITE existing data.
+  -u, --url TEXT                  URL to archive (can be repeated)
+  -p, --path PATH                 File or directory to archive (can be
+                                  repeated)
+  -i, --info TEXT                 bag-info.txt metadata in key:value format
+                                  (can be repeated)
+  --signed-metadata FILE          JSON file to be copied to data/signed-
+                                  metadata.json
+  --unsigned-metadata FILE        JSON file to be copied to unsigned-
+                                  metadata.json
+  -s, --sign <key_file>:<cert_chain>
+                                  Sign using private key and certificate chain
+                                  files (can be repeated)
+  -t, --timestamp <tsa_keyword> | <url>:<cert_chain>
+                                  Timestamp using either a TSA keyword or a
+                                  URL and cert chain (can be repeated)
+  --help                          Show this message and exit.
+```
+
+### validate
+```
+Usage:  [OPTIONS] BAG_PATH
+
+  Validate a BagIt package. bag_path is the path to the package directory to
+  validate.
+
+Options:
+  --help  Show this message and exit.
+```
+
+<!-- usage end -->
+
 File format
 -----------
 
@@ -100,8 +156,7 @@ The layout of a `bag-nabit` bag is as follows:
   * `tagmanifest-sha256.txt.p7s.tsr.crt` -- certificate file for `tagmanifest-sha256.txt.p7s.tsr`
   * `...` -- other signature files in chain
 
-headers.warc format
-+++++++++++++++++++
+### headers.warc format
 
 headers.warc is a standard [WARC](https://en.wikipedia.org/wiki/Web_ARChive) file containing request and 
 response headers from HTTP fetches for files in `data/files/`.
@@ -117,8 +172,7 @@ WARC-Type: revisit
 WARC-Profile: file-content; filename="files/data.html"
 ```
 
-`signatures/` directory format
-++++++++++++++++++++++++++++++
+### `signatures/` directory format
 
 The `signatures/` directory contains a chain of signature files and timestamp files for the tagmanifest.
 
@@ -160,8 +214,7 @@ Therefore all signatures are understood to vouch for the contents of the entire 
 in the `tagmanifest-sha256.txt` file, which is allowed but not encouraged by the BagIt spec. This is to allow
 unsigned metadata outside the data/ directory.
 
-metadata format
-+++++++++++++++
+### metadata format
 
 The BagIt specification allows minimal metadata to be stored in the bag-info.txt file,
 and any extensive metadata to be stored within the data/ directory.
@@ -175,6 +228,9 @@ this specification to encourage metadata to be stored in two files:
 
 In practice *any* files within data/ will be signed, and any files outside data/ will not,
 but the provided filenames are encouraged to ensure that users will understand the distinction.
+
+`bag-nabit` does not currently specify anything regarding the
+contents of the metadata files.
 
 Manual bag creation and editing
 -------------------------------
@@ -195,7 +251,7 @@ longer validate, and then re-run the signing and timestamping process.
 Limitations and Caveats
 -----------------------
 
-* Currently only SHA-256 is supported for hashing.
-* Currently only PKCS#7 signatures and RFC 3161 timestamps are supported.
+* Currently only SHA-256 is supported for hashing. This is only out of expediency,
+  and could be extended to other cryptographically secure hashes.
 * Because empty directories are not included in BagIt manifest files, signatures
   do not verify the presence or absence of empty directories.
