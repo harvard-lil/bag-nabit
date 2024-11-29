@@ -5,11 +5,34 @@ bag-nabit
 The tool is intended for library projects that back up public domain resources and share
 them with patrons.
 
-`bag-nabit` writes a BagIt package from either local files or remote URLs, and can also:
+`bag-nabit` writes a dialect of [BagIt](https://en.wikipedia.org/wiki/BagIt)
+from either local files or remote URLs, and can also:
 
 * Store request and response headers in a headers.warc file.
 * Attach timestamps and public-key signatures to the bag's tagmanifest file.
 * Verify format compliance and provenance chains on an existing bag-nabit bag.
+
+Design goals
+------------
+
+`bag-nabit` is designed for researchers who want to use copies of public data
+downloaded from libraries and archives, and be able to verify the provenance of downloaded data
+if necessary. A typical scenario would be a library providing a copy of a government dataset that is no longer available
+from the original source.
+
+The tool is inspired by the 
+[WARC](https://en.wikipedia.org/wiki/Web_ARChive) and 
+[wacz-auth](https://specs.webrecorder.net/wacz-auth/0.1.0/) formats,
+by [bagit-python](https://github.com/LibraryOfCongress/bagit-python),
+and by the [C2PA](https://github.com/contentauth/c2patool) format for attaching provenance information to media files.
+
+Design goals are:
+
+* Like any other BagIt file, users should be able to read metadata as a text file and directly access the underlying data.
+* Like WARC, users should be able to access request and response headers for the original source of data.
+  However, unlike WARC, downloaded payloads should be directly accessible as files rather than embedded in a container format.
+* Like C2PA and wacz-auth, bags should include certificate chains showing who (based on control of a domain or email address
+  at a particular time) vouches for the integrity of the dataset.
 
 Installation
 ------------
