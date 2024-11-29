@@ -17,8 +17,7 @@ Design goals
 
 `bag-nabit` is designed for researchers who want to use copies of public data
 downloaded from libraries and archives, and be able to verify the provenance of downloaded data
-if necessary. A typical scenario would be a library providing a copy of a government dataset that is no longer available
-from the original source.
+if necessary. A typical scenario would be a library providing a copy of a government dataset where funding has expired and the dataset is no longer available from the original source.
 
 The tool is inspired by the 
 [WARC](https://en.wikipedia.org/wiki/Web_ARChive) and 
