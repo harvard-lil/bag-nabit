@@ -20,6 +20,12 @@ Installation
 pip install https://github.com/harvard-lil/bag-nabit/archive/refs/heads/main.zip
 ```
 
+Or installed as a tool by [uv](https://docs.astral.sh/uv/):
+
+```
+uv tool install --from git+https://github.com/harvard-lil/bag-nabit nabit
+```
+
 Or run from [uvx](https://docs.astral.sh/uv/):
 
 ```
