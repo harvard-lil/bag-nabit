@@ -14,7 +14,7 @@ def update_readme():
     ctx = click.Context(main)
     
     # Get help text for the main command
-    help_text = f'```\n{ctx.get_help()}\n```\n\n'
+    help_text = f'\n```\n{ctx.get_help()}\n```\n\n'
     
     # Get help text for all commands
     for cmd_name, cmd in sorted(main.commands.items()):

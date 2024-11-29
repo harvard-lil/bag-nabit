@@ -102,7 +102,8 @@ nabit validate example_bag
 
 Command line usage
 ------------------
-<!-- usage start -->```
+<!-- usage start -->
+```
 Usage:  [OPTIONS] COMMAND [ARGS]...
 
   BagIt package signing tool
