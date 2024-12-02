@@ -86,19 +86,53 @@ def verify_timestamp(timestamp_file: Path, file_to_verify: Path, pem_file: Path)
         "-CAfile", pem_file,
     ])
 
-def sign(file_path: str, output_path: str, key: str, cert_chain: str) -> None:
+def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path) -> None:
     """Create a detached signature with full chain in PEM format."""
-    return run_openssl([
-        "cms",
-        "-sign",
-        "-binary",  # do not modify linebreaks in the original file
-        "-in", file_path,
-        "-out", output_path,
-        "-inkey", key,
-        "-signer", cert_chain,
-        "-certfile", cert_chain,  # Include the full certificate chain
-        "-outform", "PEM",
-    ])
+    # Validate the certificate chain is in PEM format
+    try:
+        run_openssl(['x509', '-in', cert_chain, '-inform', 'PEM', '-noout', '-text'])
+    except subprocess.CalledProcessError:
+        raise ValueError("cert_chain must be an x509 certificate chain in PEM format")
+
+    # We want to sign the file with the first cert in cert_chain, using -signer,
+    # and include the rest of the chain in the signature for later verification
+    # using -certfile. openssl >= 3.2.0 would let us use the same cert chain for
+    # both, but earlier versions will throw an error about the repeated cert.
+    # Therefore, split the chain into two files, and use -signer for the first cert
+    # and -certfile for the rest.
+    with tempfile.NamedTemporaryFile(suffix='.pem') as cert_chain_file, \
+         tempfile.NamedTemporaryFile(suffix='.pem') as signer_file:
+        # Read the full chain and split into individual certificates
+        cert_divider = '-----END CERTIFICATE-----\n'
+        full_chain = Path(cert_chain).read_text()
+        first_cert, remaining_chain = full_chain.split(cert_divider, 1)
+
+        # Write the first cert to the signer file
+        Path(signer_file.name).write_text(first_cert + cert_divider)
+        signer_file.flush()
+
+        # Write the remaining chain to the cert chain file if it's not empty
+        include_chain = False
+        if remaining_chain.strip():
+            include_chain = True
+            Path(cert_chain_file.name).write_text(remaining_chain)
+            cert_chain_file.flush()
+        
+        args = [
+            "cms",
+            "-sign",
+            "-binary",  # do not modify linebreaks in the original file
+            "-in", file_path,
+            "-out", output_path,
+            "-inkey", key,
+            "-signer", signer_file.name,
+            "-outform", "PEM",
+        ]
+        if include_chain:
+            args.extend(["-certfile", cert_chain_file.name])
+
+        return run_openssl(args)
+    
 
 def verify_signature(signature_file: Path, file_to_verify: Path) -> None:
     """Verify a detached signature."""
