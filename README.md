@@ -29,11 +29,16 @@ and by the [C2PA](https://github.com/contentauth/c2patool) format for attaching 
 
 Design goals are:
 
-* Like any other BagIt file, users should be able to read metadata as a text file and directly access the underlying data.
-* Like WARC, users should be able to access request and response headers for the original source of data.
-  However, unlike WARC, downloaded payloads should be directly accessible as files rather than embedded in a container format.
-* Like C2PA and wacz-auth, bags should include certificate chains showing who (based on control of a private key) vouches for the integrity of the dataset.
-* Bags should be easy to copy and back up in different archives. This means vouching should continue to work after a particular host (such as a library) goes offline. We therefore rely on the existing PKI infrastructure (such as email, domain, and document signing certificates) to establish the identity of the signer.
+* Usability:
+  * Bags should be usable for capturing both web content and file content delivered out of band.
+  * Bag content should be directly usable. For example, an archived CSV file should be readable as a CSV, rather than requiring a web archive reader.
+* Transportability and self-documentation:
+  * Users should be able to read metadata as a text file.
+  * Avoid depending on custom file formats and tooling for consuming bags. As much as possible, bags should be composed of standard file formats verifiable with existing tools. Notably, use standard WARC files for headers and standard openssl commands for signatures and timestamps.
+* Integrity and provenance:
+  * Archivists should be able to vouch for a bag when creating it. Like C2PA and wacz-auth, bags should include certificate chains showing who (based on control of a private key) vouches for the integrity of the dataset.
+  * Bags should be easy to copy and back up in different archives. Vouching should continue to work after a particular archive goes offline. We therefore rely on the existing PKI infrastructure (such as email, domain, and document signing certificates) to establish the identity of the signer.
+  * Like WARC, users should be able to access request and response headers for the original source of data.
 
 Installation
 ------------
