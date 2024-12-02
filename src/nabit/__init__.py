@@ -1,3 +1,7 @@
+# capture_http has to be imported before requests,
+# so do it right at the the top of the library.
+from warcio.capture_http import capture_http
+
 from importlib.metadata import version, PackageNotFoundError
 
 try:
