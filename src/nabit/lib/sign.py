@@ -53,8 +53,12 @@ def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> No
     with tempfile.NamedTemporaryFile(suffix='.tsq') as tsq:
         # Generate timestamp request, capturing output
         result = run_openssl([
-            "ts", "-query", "-data", file_path,
-            "-no_nonce", "-sha256", "-cert", "-out", tsq.name
+            "ts",
+            "-query",
+            "-data", file_path,
+            "-sha256",
+            "-cert",
+            "-out", tsq.name
         ])
         
         # read timestamp query file
@@ -121,12 +125,20 @@ def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path) -> None
         args = [
             "cms",
             "-sign",
-            "-binary",  # do not modify linebreaks in the original file
+            # choose explicit hash algorithm rather than default
+            "-md", "sha256",
+            # do not modify linebreaks in the original file
+            "-binary",
             "-in", file_path,
             "-out", output_path,
             "-inkey", key,
             "-signer", signer_file.name,
             "-outform", "PEM",
+            # "Exclude the list of supported algorithms from signed attributes" -- only relevant to email
+            "-nosmimecap",
+            # "add an ESS signingCertificate or ESS signingCertificateV2 signed-attribute to the SignerInfo,
+            # in order to make the signature comply with the requirements for a CAdES Basic Electronic Signature (CAdES-BES)."
+            "-cades",
         ]
         if include_chain:
             args.extend(["-certfile", cert_chain_file.name])

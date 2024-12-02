@@ -253,7 +253,7 @@ The signatures directory can contain two kinds of attestation files:
 * `.p7s` files are PKCS#7 signature files, which assert a domain or email address vouching for the bag contents.
   * `.p7s` files are created with the command:
     ```
-    openssl cms -sign -binary -in <original_file> -out <signature_file> -inkey <key_file> -signer <cert_chain> -certfile <cert_chain> -outform PEM
+    openssl cms -sign -binary -md sha256 -in <original_file> -out <signature_file> -inkey <key_file> -signer <first_cert> [-certfile <remaining_chain>] -outform PEM -nosmimecap -cades
     ```
   * `.p7s` files can be validated with the command:
     ```
@@ -262,7 +262,7 @@ The signatures directory can contain two kinds of attestation files:
 * `.tsr` files are timestamp response files, which assert a time before which the bag was created.
   * `.tsr` files are created with the command:
     ```
-    openssl ts -query -data <original_file> -no_nonce -sha256 -cert
+    openssl ts -query -data <original_file> -sha256 -cert
     ```
   * `.tsr` files can be validated with the commands:
     ```
