@@ -243,7 +243,7 @@ def validate_signatures(file_to_verify: Path, error=noop, warn=noop, success=noo
             error(f"Signature verification failed: {e}", metadata={"file": signature_file})
 
     # warn about all empty directories in bag_dir/data/
-    for dir in bag_dir.glob("data/**"):
+    for dir in bag_dir.glob("data/**/*/"):
         if not any(dir.iterdir()):
             warn(f"Cannot verify the validity of empty directories: {dir}", metadata={"dir": dir})
 
