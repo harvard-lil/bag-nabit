@@ -16,6 +16,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Check initial OpenSSL version
+      run: |
+        openssl version
+        openssl version -a
+
+    - name: Install OpenSSL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev openssl
+
+    - name: Check installed OpenSSL version
+      run: |
+        openssl version
+        openssl version -a
+
     - name: Install uv
       uses: astral-sh/setup-uv@v4
       with:
