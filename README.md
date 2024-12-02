@@ -1,6 +1,8 @@
 bag-nabit
 =========
 
+![Test Status](https://github.com/harvard-lil/bag-nabit/actions/workflows/test.yml/badge.svg)
+
 `bag-nabit` is a tool for downloading and attaching provenance information to public datasets.
 The tool is intended for library projects that back up public domain resources and share
 them with patrons.
