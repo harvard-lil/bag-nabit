@@ -2,7 +2,7 @@ import hashlib
 import shutil
 from inline_snapshot import snapshot
 from nabit.lib.archive import make_manifest
-from .utils import validate_failing, validate_passing, append_text
+from .utils import validate_failing, validate_passing, append_text, replace_hashes
 
 ## test valid packages
 
@@ -34,9 +34,9 @@ SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr verified
 
 def test_modified_payload(test_bag):
     (test_bag / "data/files/test1.txt").write_text("modified payload")
-    assert validate_failing(test_bag) == snapshot("""\
+    assert replace_hashes(validate_failing(test_bag)) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: data/files/test1.txt sha256 validation failed: expected="166cb94a04ebaef4ae79c2a0674d8cea1b7fc354eb2ea436b28c3531de10449c" found="0ef0c788f2de3fe11f1086f4a7c557ac8c812d01786b76d22477832d2e6326f9"
+ERROR: bag format is invalid: Bag validation failed: data/files/test1.txt sha256 validation failed: expected="<hash>" found="<hash>"
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -109,9 +109,9 @@ WARNING: No timestamps found\
     
 def test_signed_metadata_modified(test_bag):
     append_text(test_bag / "data/signed-metadata.json", " ")
-    assert validate_failing(test_bag) == snapshot("""\
+    assert replace_hashes(validate_failing(test_bag)) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: data/signed-metadata.json sha256 validation failed: expected="54de45672f15c85afecc685b1099a34fb2371c7e1c667eeb71f576ea58031d53" found="82642a7d2637303352c00bb68515059cc9f8dcd7f8939638e5bf317afd42d567"
+ERROR: bag format is invalid: Bag validation failed: data/signed-metadata.json sha256 validation failed: expected="<hash>" found="<hash>"
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -141,9 +141,9 @@ WARNING: No timestamps found\
 
 def test_modified_bagit(test_bag):
     append_text(test_bag / "bagit.txt", " ")
-    assert validate_failing(test_bag) == snapshot("""\
+    assert replace_hashes(validate_failing(test_bag)) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: bagit.txt sha256 validation failed: expected="e91f941be5973ff71f1dccbdd1a32d598881893a7f21be516aca743da38b1689" found="aa0a5b23d0e6a29e67136c07bc81636c4c6dbf24dc4d7d100120f8271eb02b53"
+ERROR: bag format is invalid: Bag validation failed: bagit.txt sha256 validation failed: expected="<hash>" found="<hash>"
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -161,9 +161,9 @@ WARNING: No timestamps found\
 
 def test_modified_bag_info(test_bag):
     append_text(test_bag / "bag-info.txt", " ")
-    assert validate_failing(test_bag) == snapshot("""\
+    assert replace_hashes(validate_failing(test_bag)) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: bag-info.txt sha256 validation failed: expected="927411016fb7c206d5a4cf304c1d6a1fbfea06a0b0d9ff38ca976052ecde5a49" found="b56b885f8a084f9aeb9d104385946b0799c0fc7cefbb307f36b170ae8b2968b5"
+ERROR: bag format is invalid: Bag validation failed: bag-info.txt sha256 validation failed: expected="<hash>" found="<hash>"
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -181,9 +181,9 @@ WARNING: No timestamps found\
 
 def test_simple_manifest_modification(test_bag):
     append_text(test_bag / "manifest-sha256.txt", " ")
-    assert validate_failing(test_bag) == snapshot("""\
+    assert replace_hashes(validate_failing(test_bag)) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: manifest-sha256.txt sha256 validation failed: expected="1eb4ef1aeaa8f1db13cd056ce3b74060ba0cf25d60e511c3844791c41408d87f" found="deedd551235b23948fd5abfe29c7ad4ce09c721c0bb65328da210ec93c1ee757"
+ERROR: bag format is invalid: Bag validation failed: manifest-sha256.txt sha256 validation failed: expected="<hash>" found="<hash>"
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -196,9 +196,9 @@ def test_modified_manifest_new_file(test_bag):
     hash = hashlib.sha256(b"extra payload").hexdigest()
     manifest = test_bag / "manifest-sha256.txt"
     manifest.write_text(manifest.read_text() + f"{hash}  data/files/extra.txt\n")
-    assert validate_failing(test_bag) == snapshot("""\
+    assert replace_hashes(validate_failing(test_bag)) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: manifest-sha256.txt sha256 validation failed: expected="1eb4ef1aeaa8f1db13cd056ce3b74060ba0cf25d60e511c3844791c41408d87f" found="fd34a1bf6f432cd8105c4ef2f8557130b2da249799d87a163cdc8f5080c8200b"
+ERROR: bag format is invalid: Bag validation failed: manifest-sha256.txt sha256 validation failed: expected="<hash>" found="<hash>"
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
