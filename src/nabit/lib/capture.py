@@ -56,10 +56,10 @@ class FileWriter(WARCWriter):
             # set extension
             extension = filename.suffix
             if not extension:
-                if content_type := record.http_headers.get_header('Content-Type'):
+                if content_type := record.http_headers.get_header('Content-Type'):  # pragma: no branch
                     extension = mimetypes.guess_extension(content_type.split(';')[0], strict=False)
-                if not extension:
-                    extension = '.unknown'
+                if not extension:  
+                    extension = '.unknown'  # pragma: no cover
             out_path = get_unique_path(self.files_path / f'{stem}{extension}')
             relative_path = out_path.relative_to(self.warc_path.parent)
 
@@ -74,7 +74,8 @@ class FileWriter(WARCWriter):
                     for buf in self._iter_stream(record.content_stream()):
                         fh.write(buf)
             finally:
-                if hasattr(record, '_orig_stream'):
+                if hasattr(record, '_orig_stream'):  # pragma: no cover
+                    # kept for compatibility with warcio, but not sure when used
                     record.raw_stream.close()
                     record.raw_stream = record._orig_stream
 
@@ -119,7 +120,7 @@ def validate_warc_headers(headers_path: Path, error, warn, success) -> None:
                 if record.rec_type != 'revisit':
                     continue
                 profile = record.rec_headers.get_header('WARC-Profile')
-                if profile.startswith('file-content'):
+                if profile.startswith('file-content'):  # pragma: no branch
                     # extract file path from header 'file-content; filename="..."'
                     file_path = profile.split(';')[1].split('=')[1].strip('"')
                     # normalize path to prevent directory traversal attacks

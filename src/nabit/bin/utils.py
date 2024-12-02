@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 import click
+import requests
 from ..lib.archive import validate_package
 
 
@@ -7,9 +8,10 @@ def assert_file_exists(path):
     click.Path(exists=True, path_type=str, dir_okay=False)(path)
 
 def assert_url(url):
-    parsed = urlparse(url)
-    if parsed.scheme not in ['http', 'https']:
-        raise click.BadParameter(f'Expected a URL with http or https scheme, got "{url}"')
+    try:
+        requests.Request('GET', url).prepare()
+    except requests.RequestException as e:
+        raise click.BadParameter(str(e))
     
 def cli_validate(bag_path):
     """
@@ -18,6 +20,7 @@ def cli_validate(bag_path):
     click.echo(f"Validating package at {bag_path} ...")
     has_errors = False
     def error(message: str, metadata: dict | None = None) -> None:
+        nonlocal has_errors
         click.secho("ERROR:", fg='red', bold=True, nl=False)
         click.echo(f" {message}")
         has_errors = True
@@ -33,7 +36,13 @@ def cli_validate(bag_path):
     validate_package(bag_path, error, warn, success)
 
     if has_errors:
-        click.echo("Errors found in package")
-        click.exit(1)
+        raise click.ClickException("Errors found in package")
     
     click.echo("Package is valid")
+
+
+class CaptureCommand(click.Command):
+    """ Custom click command that captures raw args to the command."""
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        ctx.raw_args = list(args)
+        return super().parse_args(ctx, args)

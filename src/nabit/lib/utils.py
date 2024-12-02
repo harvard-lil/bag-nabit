@@ -14,4 +14,4 @@ def get_unique_path(path: Path) -> Path:
 
 def noop(*args, **kwargs):
     """Default callback function that does nothing."""
-    pass
+    pass  # pragma: no cover

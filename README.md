@@ -128,18 +128,20 @@ Options:
   -u, --url TEXT                  URL to archive (can be repeated)
   -p, --path PATH                 File or directory to archive (can be
                                   repeated)
+  --hard-link                     Use hard links when copying files (when
+                                  possible)
   -i, --info TEXT                 bag-info.txt metadata in key:value format
                                   (can be repeated)
   --signed-metadata FILE          JSON file to be copied to data/signed-
                                   metadata.json
   --unsigned-metadata FILE        JSON file to be copied to unsigned-
                                   metadata.json
-  -s, --sign <key_file>:<cert_chain>
-                                  Sign using private key and certificate chain
+  -s, --sign <cert_chain>:<key_file>
+                                  Sign using certificate chain and private key
                                   files (can be repeated)
-  -t, --timestamp <tsa_keyword> | <url>:<cert_chain>
+  -t, --timestamp <tsa_keyword> | <cert_chain>:<url>
                                   Timestamp using either a TSA keyword or a
-                                  URL and cert chain (can be repeated)
+                                  cert chain path and URL (can be repeated)
   --help                          Show this message and exit.
 ```
 
@@ -310,6 +312,29 @@ but the provided filenames are encouraged to ensure that users will understand t
 
 `bag-nabit` does not currently specify anything regarding the
 contents of the metadata files.
+
+Development
+-----------
+
+We use [uv](https://docs.astral.sh/uv/) to manage development dependencies. After cloning the repository, to run from source:
+
+```
+uv run nabit
+```
+
+This will automatically install dependencies and run the command.
+
+To run tests:
+
+```
+uv run pytest
+```
+
+Some tests use the [inline-snapshot](https://github.com/15r10nk/inline-snapshot/) library. If the tool output changes
+intentionally, you may need to run `uv run pytest --inline-snapshot=review` to review the changes and apply them
+to test files.
+
+After making changes to the command line interface, run `uv run scripts/update_docs.py` to update README.md.
 
 Limitations and Caveats
 -----------------------

@@ -9,7 +9,7 @@ dependencies = [
     "warcio>=1.7.4",
     "requests>=2.32.3",
     "bagit>=1.8.1",
-    "setuptools>=75.6.0",
+    "setuptools>=75.6.0",  # required by bagit
 ]
 
 [project.scripts]
@@ -18,3 +18,20 @@ nabit = "nabit.bin.cli:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.3",
+    "inline-snapshot>=0.14.0",
+    "pytest-cov>=6.0.0",
+    "pytest-httpserver>=1.1.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=nabit --cov-report=term-missing"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["nabit"]
+branch = true
+

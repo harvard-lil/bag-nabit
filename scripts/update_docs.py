@@ -4,13 +4,13 @@ import sys
 import re
 # Add the project root to Python path so we can import the CLI
 project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
 
-from nabit.bin.cli import main, archive, validate
+from nabit.bin.cli import main
+
+readme_path = project_root / 'README.md'
 
 
-def update_readme():
-    """Update README.md with latest command help"""
+def get_new_readme_text():
     ctx = click.Context(main)
     
     # Get help text for the main command
@@ -33,7 +33,12 @@ def update_readme():
         readme_content, 
         flags=re.DOTALL
     )
-    readme_path.write_text(readme_content)
+
+    return readme_content
+
+def update_readme():
+    """Update README.md with latest command help"""
+    readme_path.write_text(get_new_readme_text())
     print("README.md updated")
 
 if __name__ == '__main__':

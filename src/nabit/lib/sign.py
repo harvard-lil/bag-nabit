@@ -8,7 +8,7 @@ import pkg_resources
 
 from .utils import noop
 
-# for testing, set ROOT_CA=test/fixtures/pki/root-ca.crt
+# for testing, set ROOT_CA=tests/fixtures/pki/root-ca.crt
 ROOT_CA = os.environ.get("ROOT_CA")
 
 # Add this constant near the top of the file, after imports
@@ -36,7 +36,6 @@ def run_openssl(args: list[str | Path]) -> subprocess.CompletedProcess:
         result = subprocess.run(
             command,
             capture_output=True,
-            text=True,
             check=True
         )
         return result
@@ -112,7 +111,7 @@ def verify_signature(signature_file: Path, file_to_verify: Path) -> None:
         "-inform", "PEM",
         "-purpose", "any",  # we are using domain and email certs
     ]
-    if ROOT_CA:
+    if ROOT_CA:  # pragma: no branch
         args.extend(["-CAfile", ROOT_CA])
     return run_openssl(args)
 
@@ -168,6 +167,8 @@ def add_signatures(file_to_sign: Path, signatures_path: Path, signatures: list[d
         elif action == "timestamp":
             output_path = output_path.with_suffix(output_path.suffix + '.tsr')
             timestamp(file_to_sign, output_path, **params)
+        else:
+            raise ValueError(f"Unknown action: {action}")  # pragma: no cover
         file_to_sign = output_path
 
 def validate_signatures(file_to_verify: Path, error=noop, warn=noop, success=noop) -> None:

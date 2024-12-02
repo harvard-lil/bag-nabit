@@ -12,15 +12,15 @@ import hashlib
 # files to ignore when copying directories
 IGNORE_PATTERNS = ['.DS_Store']
 
-
-
-
 def validate_bag_format(bag_path: Path, error, warn, success) -> None:
     """Verify bag format."""
-    bag = bagit.Bag(str(bag_path))
     try:
+        bag = bagit.Bag(str(bag_path))
         bag.validate()
-    except bagit.BagValidationError as e:
+        # BagIt considers tagmanifest-sha256.txt optional, but we require it
+        if not (bag_path / "tagmanifest-sha256.txt").exists():
+            raise bagit.BagValidationError("No tagmanifest-sha256.txt found")
+    except bagit.BagError as e:
         error(f"bag format is invalid: {e}")
     else:
         success("bag format is valid")
@@ -31,7 +31,7 @@ def validate_data_files(bag_path: Path, error = None, warn = noop, success = noo
     actual_files = set(f.name for f in bag_path.glob('data/*'))
     unexpected_files = actual_files - expected_files
     if unexpected_files:
-        warn(f"{len(unexpected_files)} unexpected files in data/. Expected: {expected_files}")
+        warn(f"{len(unexpected_files)} unexpected files in data/, starting with {sorted(unexpected_files)[0]}.")
 
 def validate_package(bag_path: Path, error = None, warn = noop, success = noop) -> None:
     """
@@ -53,6 +53,29 @@ def validate_package(bag_path: Path, error = None, warn = noop, success = noop) 
     validate_bag_format(bag_path, error, warn, success)
     validate_signatures(tagmanifest_path, error, warn, success)
 
+def copy_paths(source_paths: list[Path | str], dest_dir: Path, use_hard_links: bool = False) -> None:
+    """Copy paths to a destination directory, optionally using hard links."""
+    for path in source_paths:
+        path = Path(path)
+        dest_path = get_unique_path(dest_dir / path.name)
+        # can only use hard links if source and destination are on the same device
+        use_hard_links = use_hard_links and os.stat(path).st_dev == os.stat(dest_dir).st_dev
+        if path.is_file():
+            if use_hard_links:
+                os.link(path, dest_path)
+            else:
+                shutil.copy2(path, dest_path)
+        else:
+            copy_function = os.link if use_hard_links else shutil.copy2
+            # link directory contents recursively
+            shutil.copytree(
+                path, 
+                dest_path, 
+                dirs_exist_ok=True, 
+                copy_function=copy_function, 
+                ignore=shutil.ignore_patterns(*IGNORE_PATTERNS)
+            )
+
 def package(
     output_path: Path | str,
     amend: bool = False,
@@ -61,7 +84,8 @@ def package(
     bag_info: dict | None = None,
     signatures: list[dict] | None = None,
     signed_metadata: Path | str | None = None,
-    unsigned_metadata: Path | str | None = None
+    unsigned_metadata: Path | str | None = None,
+    use_hard_links: bool = False,
 ) -> None:
     """
     Create a BagIt package.
@@ -72,32 +96,18 @@ def package(
     Copy signed_metadata to data/signed-metadata.json.
     Copy unsigned_metadata to unsigned-metadata.json.
     """
-    urls = urls or []
-    paths = paths or []
     bag_info = bag_info or {}
     
     # add data files
     output_path = Path(output_path)
     data_path = output_path / 'data'
-    data_path.mkdir(exist_ok=True, parents=True)
+    files_path = data_path / 'files'
+    files_path.mkdir(exist_ok=True, parents=True)
 
     if urls:
         capture(urls, data_path / 'headers.warc')
-    for path in paths:
-        path = Path(path)
-        dest_path = get_unique_path(data_path / "files" / path.name)
-        if path.is_file():
-            # Use hard link for single files
-            os.link(path, dest_path)
-        else:
-            # link directory contents recursively
-            shutil.copytree(
-                path, 
-                dest_path, 
-                dirs_exist_ok=True, 
-                copy_function=os.link, 
-                ignore=shutil.ignore_patterns(*IGNORE_PATTERNS)
-            )
+    if paths:
+        copy_paths(paths, files_path, use_hard_links)
 
     # Add metadata files
     if signed_metadata is not None:
@@ -153,13 +163,15 @@ def package(
         def error(message: str, metadata: dict | None = None) -> None:
             print(f"Signature file {metadata['file']} no longer validates. Removing.")
             os.remove(metadata['file'])
-            if 'pem_file' in metadata:
-                os.remove(metadata['pem_file'])
+        def warn(message: str, metadata: dict | None = None) -> None:
+            if metadata and 'file' in metadata:
+                print(f"Signature file {metadata['file']} unrecognized. Removing.")
+                os.remove(metadata['file'])
         def success(message: str, metadata: dict | None = None) -> None:
             nonlocal sign_path
             print(f"Signature file {metadata['file']} still validates. Retaining.")
             sign_path = metadata['file']
-        validate_signatures(sign_path, error=error, success=success)
+        validate_signatures(sign_path, error=error, warn=warn, success=success)
 
     if signatures:
         add_signatures(sign_path, output_path / "signatures", signatures)
