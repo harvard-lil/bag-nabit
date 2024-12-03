@@ -143,6 +143,10 @@ Options:
                                   metadata.json
   --unsigned-metadata FILE        JSON file to be copied to unsigned-
                                   metadata.json
+  --signed-metadata-json TEXT     JSON string to be written to data/signed-
+                                  metadata.json
+  --unsigned-metadata-json TEXT   JSON string to be written to unsigned-
+                                  metadata.json
   -s, --sign <cert_chain>:<key_file>
                                   Sign using certificate chain and private key
                                   files (can be repeated)

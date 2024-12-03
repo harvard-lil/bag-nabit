@@ -20,10 +20,14 @@ def main():
 @click.option('--path', '-p', 'paths', multiple=True, type=click.Path(exists=True, path_type=Path), help='File or directory to archive (can be repeated)')
 @click.option('--hard-link', is_flag=True, help='Use hard links when copying files (when possible)')
 @click.option('--info', '-i', multiple=True, help='bag-info.txt metadata in key:value format (can be repeated)')
-@click.option('--signed-metadata', type=click.Path(exists=True, path_type=Path, dir_okay=False),
+@click.option('--signed-metadata', 'signed_metadata_path', type=click.Path(exists=True, path_type=Path, dir_okay=False),
             help='JSON file to be copied to data/signed-metadata.json')
-@click.option('--unsigned-metadata', type=click.Path(exists=True, path_type=Path, dir_okay=False),
+@click.option('--unsigned-metadata', 'unsigned_metadata_path', type=click.Path(exists=True, path_type=Path, dir_okay=False),
             help='JSON file to be copied to unsigned-metadata.json')
+@click.option('--signed-metadata-json', type=str,
+            help='JSON string to be written to data/signed-metadata.json')
+@click.option('--unsigned-metadata-json', type=str,
+            help='JSON string to be written to unsigned-metadata.json')
 @click.option('--sign', '-s', 'signature_args', multiple=True,
             help='Sign using certificate chain and private key files (can be repeated)',
             metavar='<cert_chain>:<key_file>',
@@ -33,21 +37,44 @@ def main():
             metavar='<tsa_keyword> | <cert_chain>:<url>',
             )
 @click.pass_context
-def archive(ctx, bag_path, amend, urls, paths, hard_link, info, signed_metadata, unsigned_metadata, signature_args):
+def archive(
+    ctx,
+    bag_path,
+    amend,
+    urls,
+    paths,
+    hard_link,
+    info,
+    signed_metadata_path,
+    unsigned_metadata_path,
+    signed_metadata_json,
+    unsigned_metadata_json,
+    signature_args
+):
     """
     Archive files and URLs into a BagIt package.
     bag_path is the destination directory for the package.
     """
-    # Validate JSON files if provided
-    for metadata_path in (signed_metadata, unsigned_metadata):
-        if not metadata_path:
-            continue
-        if not metadata_path.suffix.lower() == '.json':
-            raise click.BadParameter(f'Metadata file must be a .json file, got "{metadata_path}"')
-        try:
-            json.loads(metadata_path.read_text())
-        except json.JSONDecodeError as e:
-            raise click.BadParameter(f'Metadata file must be valid JSON, got "{metadata_path}": {e}')
+    # Process metadata from files and JSON strings
+    metadata = {'signed': None, 'unsigned': None}
+    for prefix in ('signed', 'unsigned'):
+        metadata_path = ctx.params[f'{prefix}_metadata_path']
+        metadata_json = ctx.params[f'{prefix}_metadata_json']
+
+        if metadata_path and metadata_json:
+            raise click.BadParameter(f"Cannot specify both --{prefix}-metadata and --{prefix}-metadata-json")
+        if metadata_path:
+            if not metadata_path.suffix.lower() == '.json':
+                raise click.BadParameter(f'Metadata file must be a .json file, got "{metadata_path}"')
+            try:
+                metadata[prefix] = json.loads(metadata_path.read_text())
+            except json.JSONDecodeError as e:
+                raise click.BadParameter(f'Metadata file must be valid JSON, got "{metadata_path}": {e}')
+        elif metadata_json:
+            try:
+                metadata[prefix] = json.loads(metadata_json)
+            except json.JSONDecodeError as e:
+                raise click.BadParameter(f'Invalid JSON string for --{prefix}-metadata-json: {e}')
 
     # Check if output directory exists and is not empty
     if bag_path.exists() and any(bag_path.iterdir()):
@@ -116,8 +143,8 @@ def archive(ctx, bag_path, amend, urls, paths, hard_link, info, signed_metadata,
         urls=urls,
         bag_info=bag_info,
         signatures=signatures,
-        signed_metadata=signed_metadata,
-        unsigned_metadata=unsigned_metadata,
+        signed_metadata=metadata['signed'],
+        unsigned_metadata=metadata['unsigned'],
         amend=amend,
         use_hard_links=hard_link,
     )

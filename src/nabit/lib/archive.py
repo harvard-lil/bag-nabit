@@ -8,6 +8,7 @@ from .capture import validate_warc_headers, capture
 from .sign import validate_signatures, KNOWN_TSAS, add_signatures
 from .. import __version__
 import hashlib
+import json
 
 # files to ignore when copying directories
 IGNORE_PATTERNS = ['.DS_Store']
@@ -83,8 +84,8 @@ def package(
     paths: list[Path | str] | None = None,
     bag_info: dict | None = None,
     signatures: list[dict] | None = None,
-    signed_metadata: Path | str | None = None,
-    unsigned_metadata: Path | str | None = None,
+    signed_metadata: dict | None = None,
+    unsigned_metadata: dict | None = None,
     use_hard_links: bool = False,
 ) -> None:
     """
@@ -93,8 +94,8 @@ def package(
     Copy all paths, using hard links, into data/files/.
     Include bag_info in bag-info.txt.
     If signatures are provided, add them to tagmanifest-sha256.txt.
-    Copy signed_metadata to data/signed-metadata.json.
-    Copy unsigned_metadata to unsigned-metadata.json.
+    Write signed_metadata to data/signed-metadata.json.
+    Write unsigned_metadata to unsigned-metadata.json.
     """
     bag_info = bag_info or {}
     
@@ -111,9 +112,9 @@ def package(
 
     # Add metadata files
     if signed_metadata is not None:
-        os.link(signed_metadata, data_path / "signed-metadata.json")
+        (data_path / "signed-metadata.json").write_text(json.dumps(signed_metadata, indent=2))
     if unsigned_metadata is not None:
-        os.link(unsigned_metadata, output_path / "unsigned-metadata.json")
+        (output_path / "unsigned-metadata.json").write_text(json.dumps(unsigned_metadata, indent=2))
     
     ## add bag files
     bag_changed = not amend

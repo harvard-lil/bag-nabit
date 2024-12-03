@@ -27,8 +27,8 @@ def test_bag(tmp_path, test_files):
     package(
         output_path=bag_path,
         paths=test_files["payload"],
-        signed_metadata=test_files["signed_metadata"],
-        unsigned_metadata=test_files["unsigned_metadata"],
+        signed_metadata=test_files["signed_metadata"].read_text(),
+        unsigned_metadata=test_files["unsigned_metadata"].read_text(),
         bag_info={"Source-Organization": "Test Org"}
     )
     return bag_path
@@ -60,8 +60,8 @@ def signed_bag(tmp_path, test_files, root_ca):
     package(
         output_path=bag_path,
         paths=test_files["payload"],
-        signed_metadata=test_files["signed_metadata"],
-        unsigned_metadata=test_files["unsigned_metadata"],
+        signed_metadata=test_files["signed_metadata"].read_text(),
+        unsigned_metadata=test_files["unsigned_metadata"].read_text(),
         bag_info={"Source-Organization": "Test Org"},
         signatures=[
             {

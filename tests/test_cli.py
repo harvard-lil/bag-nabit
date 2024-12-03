@@ -3,6 +3,7 @@ from nabit.lib.sign import KNOWN_TSAS
 from inline_snapshot import snapshot
 import json
 import re
+import pytest
 
 from tests.utils import validate_passing
 from .utils import validate_passing, validate_failing
@@ -80,8 +81,19 @@ WARNING: No timestamps found\
     assert (bag_path / 'data/files/another.html').read_text() == 'another content'
     assert (bag_path / 'data/files/test.txt').read_text() == 'test content'
 
-def test_metadata(runner, tmp_path, test_files):
+@pytest.mark.parametrize('metadata_format', ['file', 'json'])
+def test_metadata(runner, tmp_path, test_files, metadata_format):
     bag_path = tmp_path / 'bag'
+    if metadata_format == 'file':
+        extra_args = [
+            '--unsigned-metadata', str(test_files["unsigned_metadata"]),
+            '--signed-metadata', str(test_files["signed_metadata"]),
+        ]
+    else:
+        extra_args = [
+            '--unsigned-metadata-json', '{"metadata": "unsigned"}',
+            '--signed-metadata-json', '{"metadata": "signed"}',
+        ]
     run(runner, [
         'archive',
         str(bag_path),
@@ -89,8 +101,7 @@ def test_metadata(runner, tmp_path, test_files):
         '-i', 'Source-Organization:Test Org',
         '-i', 'Contact-Email:test1@example.com',
         '-i', 'Contact-Email:test2@example.com',
-        '--unsigned-metadata', str(test_files["unsigned_metadata"]),
-        '--signed-metadata', str(test_files["signed_metadata"]),
+        *extra_args,
     ])
     assert validate_passing(bag_path) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
@@ -312,6 +323,21 @@ def test_invalid_metadata_file_contents(runner, tmp_path, test_files):
         str(tmp_path / 'bag'),
         '--signed-metadata', str(tmp_path / 'metadata.json'),
     ], exit_code=2, output='Metadata file must be valid JSON')
+
+def test_invalid_metadata_json_string(runner, tmp_path, test_files):
+    run(runner, [
+        'archive',
+        str(tmp_path / 'bag'),
+        '--signed-metadata-json', 'invalid json',
+    ], exit_code=2, output='Invalid JSON')
+
+def test_cannot_combine_metadata_file_and_json(runner, tmp_path, test_files):
+    run(runner, [
+        'archive',
+        str(tmp_path / 'bag'),
+        '--signed-metadata', str(test_files["signed_metadata"]),
+        '--signed-metadata-json', '{"metadata": "signed"}',
+    ], exit_code=2, output='Cannot specify both --signed-metadata and --signed-metadata-json')
 
 def test_invalid_info_format(runner, tmp_path):
     run(runner, [
