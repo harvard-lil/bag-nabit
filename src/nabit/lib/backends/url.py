@@ -38,6 +38,8 @@ class UrlCollectionTask(CollectionTask):
     url: str
     output: Path | None = None
 
+    timeout: float = 5.0
+
     def __post_init__(self):
         """Validate the URL by attempting to prepare a request."""
         requests.Request('GET', self.url).prepare()
@@ -52,7 +54,7 @@ class UrlCollectionTask(CollectionTask):
             warc_writer = FileWriter(fh, warc_path, gzip=False)
             with capture_http(warc_writer):
                 warc_writer.custom_out_path = self.output
-                requests.get(self.url)
+                requests.get(self.url, timeout=self.timeout)
 
 
 class FileWriter(WARCWriter):
@@ -70,7 +72,7 @@ class FileWriter(WARCWriter):
         self.files_path.mkdir(exist_ok=True)
 
     def _write_warc_record(self, out, record):
-        if record.rec_type == 'response' and record.http_headers.get_statuscode() in self.revisit_status_codes:
+        if record.rec_type == 'response' and record.http_headers and record.http_headers.get_statuscode() in self.revisit_status_codes:
             # Convert successful responses to revisit records
             record.rec_type = 'revisit'
             headers = record.rec_headers
