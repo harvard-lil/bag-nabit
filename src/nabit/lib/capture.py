@@ -33,6 +33,7 @@ class FileWriter(WARCWriter):
     """
     A WARC writer that stores response bodies uncompressed in the files/ directory.
     """
+    revisit_status_codes = set(['200', '203'])
     def __init__(self, filebuf, warc_path: Path, *args, **kwargs):
         super(WARCWriter, self).__init__(*args, **kwargs)
         self.out = filebuf
@@ -41,8 +42,8 @@ class FileWriter(WARCWriter):
         self.files_path.mkdir(exist_ok=True)
 
     def _write_warc_record(self, out, record):
-        if record.rec_type == 'response':
-            # if we see a response record, convert it to a revisit record
+        if record.rec_type == 'response' and record.http_headers.get_statuscode() in self.revisit_status_codes:
+            # Convert successful responses to revisit records
             record.rec_type = 'revisit'
             headers = record.rec_headers
             headers.replace_header('WARC-Type', 'revisit')
@@ -69,15 +70,23 @@ class FileWriter(WARCWriter):
             ## write the response body to the file
             # this is copied from the underlying WARCWriter._write_warc_record method,
             # except that we uncompress the response body before writing it to the file.
+            output_size = 0
             try:
                 with open(out_path, 'wb') as fh:
                     for buf in self._iter_stream(record.content_stream()):
                         fh.write(buf)
+                        output_size += len(buf)
             finally:
                 if hasattr(record, '_orig_stream'):  # pragma: no cover
                     # kept for compatibility with warcio, but not sure when used
                     record.raw_stream.close()
                     record.raw_stream = record._orig_stream
+
+            # if the response body turns out to be empty, undo the conversion to a revisit record
+            if output_size == 0:
+                out_path.unlink()
+                headers.replace_header('WARC-Type', 'response')
+                headers.remove_header('WARC-Profile')
 
         return super()._write_warc_record(out, record)
 

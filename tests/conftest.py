@@ -90,4 +90,6 @@ def server(httpserver):
     httpserver.expect_request("/").respond_with_data("root content", content_type="text/html")
     httpserver.expect_request("/another.html").respond_with_data("another content", content_type="text/html")
     httpserver.expect_request("/test.txt").respond_with_data("test content", content_type="text/plain")
+    httpserver.expect_request("/empty").respond_with_data("", content_type="text/plain")
+    httpserver.expect_request("/redirect").respond_with_data("", status=302, headers={"Location": "/test.txt"})
     return httpserver
