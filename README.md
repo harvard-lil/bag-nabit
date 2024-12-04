@@ -132,9 +132,12 @@ Usage:  [OPTIONS] BAG_PATH
 Options:
   -a, --amend                     Update an existing archive. May add OR
                                   OVERWRITE existing data.
-  -u, --url TEXT                  URL to archive (can be repeated)
+  -u, --url TEXT                  URL to archive (can be repeated). May be a
+                                  bare url or a JSON dict with a "url" key and
+                                  an optional "output" key
   -p, --path PATH                 File or directory to archive (can be
                                   repeated)
+  -c, --collect TEXT              Collection tasks in JSON format
   --hard-link                     Use hard links when copying files (when
                                   possible)
   -i, --info TEXT                 bag-info.txt metadata in key:value format
@@ -205,6 +208,29 @@ In many situations it may make sense to create and sign bags on different machin
   nabit archive example_bag --amend -s mykey.pem:mychain.pem -t digicert
   ```
 * The signed bag is then published to the archive, perhaps simply by copying the bag directory to a public file server.
+
+Collection backends
+-------------------
+
+`bag-nabit` is not primarily a web archiving tool, but it supports collection backends that can gather both web content and file content. Collection tasks can be provided as JSON content passed to the `--collect` flag to `nabit archive`:
+
+```
+nabit archive example_bag --collect '[
+  {"backend": "url", "url": "https://example.com/", "output": "example_com.html"},
+  {"backend": "path", "path": "/path/to/local/file"}
+]'
+```
+
+Currently supported collection backends are:
+
+* `url`: fetch URLs with python `requests`, following redirects. Write metadata to data/headers.warc. Equivalent to the `-u` flag to `nabit archive`. Keys:
+  * `url`: the URL to fetch
+  * `output` (optional): the path to save the fetched content to in the bag, relative to `data/files/`. If not provided, the content will be saved to `data/files/<url_path>`, where `<url_path>` is the last path component of the URL.
+* `path`: copy local files or directories to the bag. Equivalent to the `-p` flag to `nabit archive`. Keys:
+  * `path`: the path to the local file or directory to copy
+  * `output` (optional): the path to save the fetched content to in the bag.
+
+Future backends could include ftp, web crawlers, etc.
 
 File format
 -----------

@@ -1,17 +1,16 @@
 from pathlib import Path
-import shutil
 from datetime import date
 import bagit
 import os
-from .utils import get_unique_path, noop
-from .capture import validate_warc_headers, capture
-from .sign import validate_signatures, KNOWN_TSAS, add_signatures
-from .. import __version__
 import hashlib
 import json
 
-# files to ignore when copying directories
-IGNORE_PATTERNS = ['.DS_Store']
+from .utils import noop
+from .backends.url import validate_warc_headers
+from .sign import validate_signatures, KNOWN_TSAS, add_signatures
+from .. import __version__
+from .backends.base import CollectionTask
+
 
 def validate_bag_format(bag_path: Path, error, warn, success) -> None:
     """Verify bag format."""
@@ -54,34 +53,10 @@ def validate_package(bag_path: Path, error = None, warn = noop, success = noop) 
     validate_bag_format(bag_path, error, warn, success)
     validate_signatures(tagmanifest_path, error, warn, success)
 
-def copy_paths(source_paths: list[Path | str], dest_dir: Path, use_hard_links: bool = False) -> None:
-    """Copy paths to a destination directory, optionally using hard links."""
-    for path in source_paths:
-        path = Path(path)
-        dest_path = get_unique_path(dest_dir / path.name)
-        # can only use hard links if source and destination are on the same device
-        use_hard_links = use_hard_links and os.stat(path).st_dev == os.stat(dest_dir).st_dev
-        if path.is_file():
-            if use_hard_links:
-                os.link(path, dest_path)
-            else:
-                shutil.copy2(path, dest_path)
-        else:
-            copy_function = os.link if use_hard_links else shutil.copy2
-            # link directory contents recursively
-            shutil.copytree(
-                path, 
-                dest_path, 
-                dirs_exist_ok=True, 
-                copy_function=copy_function, 
-                ignore=shutil.ignore_patterns(*IGNORE_PATTERNS)
-            )
-
 def package(
     output_path: Path | str,
     amend: bool = False,
-    urls: list[str] | None = None,
-    paths: list[Path | str] | None = None,
+    collect: list[CollectionTask] | None = None,
     bag_info: dict | None = None,
     signatures: list[dict] | None = None,
     signed_metadata: dict | None = None,
@@ -105,10 +80,9 @@ def package(
     files_path = data_path / 'files'
     files_path.mkdir(exist_ok=True, parents=True)
 
-    if urls:
-        capture(urls, data_path / 'headers.warc')
-    if paths:
-        copy_paths(paths, files_path, use_hard_links)
+    if collect:
+        for task in collect:
+            task.collect(files_path)
 
     # Add metadata files
     if signed_metadata is not None:

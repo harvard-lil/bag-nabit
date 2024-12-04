@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 
 from .utils import assert_file_exists, assert_url, cli_validate, CaptureCommand
-from ..lib.archive import package, validate_package
+from ..lib.archive import package
 from ..lib.sign import KNOWN_TSAS
+from ..lib.backends.base import CollectionTask
+from ..lib.backends.path import PathCollectionTask
 
 @click.group()
 def main():
@@ -16,8 +18,9 @@ def main():
 @main.command(cls=CaptureCommand)
 @click.argument('bag_path', type=click.Path(path_type=Path))
 @click.option('--amend', '-a', is_flag=True, help='Update an existing archive. May add OR OVERWRITE existing data.')
-@click.option('--url', '-u', 'urls', multiple=True, help='URL to archive (can be repeated)')
+@click.option('--url', '-u', 'urls', multiple=True, help='URL to archive (can be repeated). May be a bare url or a JSON dict with a "url" key and an optional "output" key')
 @click.option('--path', '-p', 'paths', multiple=True, type=click.Path(exists=True, path_type=Path), help='File or directory to archive (can be repeated)')
+@click.option('--collect', '-c', 'collect', help='Collection tasks in JSON format')
 @click.option('--hard-link', is_flag=True, help='Use hard links when copying files (when possible)')
 @click.option('--info', '-i', multiple=True, help='bag-info.txt metadata in key:value format (can be repeated)')
 @click.option('--signed-metadata', 'signed_metadata_path', type=click.Path(exists=True, path_type=Path, dir_okay=False),
@@ -43,6 +46,7 @@ def archive(
     amend,
     urls,
     paths,
+    collect,
     hard_link,
     info,
     signed_metadata_path,
@@ -98,9 +102,41 @@ def archive(
             raise click.BadParameter(f'Metadata must be in "key:value" format, got "{item}"')
         bag_info[key.strip()].append(value.strip())
 
-    # validate URLs
+    # Convert collect to list if it's a tuple
+    if collect:
+        try:
+            collect = json.loads(collect)
+        except json.JSONDecodeError:
+            raise click.BadParameter(f'Invalid JSON string for --collect: {collect}')
+        if not isinstance(collect, list):
+            raise click.BadParameter(f'--collect must be a list of JSON objects, got {collect}')
+    else:
+        collect = []
+
+    # Append --url and --path to --collect
     for url in urls:
-        assert_url(url)
+        try:
+            url_dict = json.loads(url)
+            url_dict['backend'] = 'url'
+        except json.JSONDecodeError:
+            url_dict = {'backend': 'url', 'url': url}
+        collect.append(url_dict)
+    for path in paths:
+        collect.append({'backend': 'path', 'path': str(path)})
+
+    # Process and validate collect
+    processed_collect = []
+    for task in collect:
+        try:
+            processed_collect.append(CollectionTask.from_dict(task))
+        except Exception as e:
+            raise click.BadParameter(f'Invalid task definition for --collect: {task} resulted in {e}')
+
+    # handle --hard-link option
+    if hard_link:
+        for task in processed_collect:
+            if isinstance(task, PathCollectionTask):
+                task.hard_links = True
 
     ## handle --sign and --timestamp options
     # order matters, so get ordered list of signature flags from sys.argv
@@ -139,8 +175,7 @@ def archive(
 
     package(
         output_path=bag_path,
-        paths=paths,
-        urls=urls,
+        collect=processed_collect,
         bag_info=bag_info,
         signatures=signatures,
         signed_metadata=metadata['signed'],

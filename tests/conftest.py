@@ -4,7 +4,8 @@ from pytest_httpserver import HTTPServer
 
 from nabit.lib.archive import package
 from nabit.lib.sign import KNOWN_TSAS
-
+from nabit.lib.backends.path import PathCollectionTask
+from nabit.lib.backends.url import UrlCollectionTask
 
 @pytest.fixture
 def test_files(tmp_path):
@@ -26,7 +27,10 @@ def test_bag(tmp_path, test_files):
     bag_path = tmp_path / "test_bag"
     package(
         output_path=bag_path,
-        paths=test_files["payload"],
+        collect=[
+            PathCollectionTask(path=str(test_files["payload"][0])),
+            PathCollectionTask(path=str(test_files["payload"][1]))
+        ],
         signed_metadata=test_files["signed_metadata"].read_text(),
         unsigned_metadata=test_files["unsigned_metadata"].read_text(),
         bag_info={"Source-Organization": "Test Org"}
@@ -40,7 +44,9 @@ def warc_bag(tmp_path, server):
     bag_path = tmp_path / "warc_bag"
     package(
         output_path=bag_path,
-        urls=[server.url_for("/")],
+        collect=[
+            UrlCollectionTask(url=server.url_for("/"))
+        ],
         bag_info={"Source-Organization": "Test Org"}
     )
     return bag_path
@@ -59,7 +65,10 @@ def signed_bag(tmp_path, test_files, root_ca):
     # TODO: don't call out to live TSA server
     package(
         output_path=bag_path,
-        paths=test_files["payload"],
+        collect=[
+            PathCollectionTask(path=str(test_files["payload"][0])),
+            PathCollectionTask(path=str(test_files["payload"][1]))
+        ],
         signed_metadata=test_files["signed_metadata"].read_text(),
         unsigned_metadata=test_files["unsigned_metadata"].read_text(),
         bag_info={"Source-Organization": "Test Org"},

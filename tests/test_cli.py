@@ -306,6 +306,45 @@ def test_duplicate_file_names(runner, tmp_path, server):
     files = sorted((p.name for p in (bag_path / "data" / "files").glob("data*.html")))
     assert re.match(r"data-[0-9a-zA-Z]{6}\.html;data-[0-9a-zA-Z]{6}\.html;data\.html", ";".join(files))
 
+def test_url_with_custom_output_path(runner, tmp_path, server):
+    """Test archiving a URL with a custom output path"""
+    bag_path = tmp_path / 'bag'
+    custom_output_path = 'custom_output.html'
+    
+    run(runner, [
+        'archive',
+        str(bag_path),
+        '-u', f'{{"url": "{server.url_for("/")}", "output": "{custom_output_path}"}}',
+        '-u', server.url_for("/another.html"),
+    ])
+    
+    # Verify that the file is saved with the custom output path
+    assert (bag_path / f'data/files/{custom_output_path}').read_text() == 'root content'
+    assert (bag_path / f'data/files/another.html').read_text() == 'another content'
+    assert validate_passing(bag_path) == snapshot("""\
+SUCCESS: headers.warc found
+SUCCESS: bag format is valid
+WARNING: No signatures found
+WARNING: No timestamps found\
+""")
+
+def test_collect_json(runner, tmp_path, server):
+    """Test successful parsing of --collect JSON"""
+    bag_path = tmp_path / 'bag'
+    collect_tasks = [
+        {"backend": "url", "url": server.url_for("/")},
+        {"backend": "url", "url": server.url_for("/another.html"), "output": "custom.html"}
+    ]
+    
+    run(runner, [
+        'archive',
+        str(bag_path),
+        '--collect', json.dumps(collect_tasks)
+    ])
+    
+    assert (bag_path / 'data/files/data.html').read_text() == 'root content'
+    assert (bag_path / 'data/files/custom.html').read_text() == 'another content'
+
 ## validation errors
 
 def test_invalid_metadata_file_extension(runner, tmp_path):
@@ -398,3 +437,26 @@ def test_empty_package(runner, tmp_path):
         'archive',
         str(tmp_path),
     ], exit_code=1, output='No files in data/files')
+
+def test_invalid_collect_json(runner, tmp_path):
+    """Test error handling for invalid --collect JSON"""
+    # Test invalid JSON syntax
+    run(runner, [
+        'archive',
+        str(tmp_path / 'bag'),
+        '--collect', '{invalid json}'
+    ], exit_code=2, output='Invalid JSON string for --collect')
+
+    # Test non-list JSON
+    run(runner, [
+        'archive',
+        str(tmp_path / 'bag'),
+        '--collect', '{"not": "a list"}'
+    ], exit_code=2, output='--collect must be a list of JSON objects')
+
+    # Test invalid task definition
+    run(runner, [
+        'archive',
+        str(tmp_path / 'bag'),
+        '--collect', '[{"backend": "invalid"}]'
+    ], exit_code=2, output='Invalid task definition for --collect')

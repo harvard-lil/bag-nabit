@@ -4,9 +4,12 @@ from warcio.capture_http import capture_http
 from urllib.parse import urlparse
 import mimetypes
 from pathlib import Path
-import requests  # requests must be imported after capture_http
+import requests
 import os
-from nabit.lib.utils import get_unique_path
+from dataclasses import dataclass
+from ..utils import get_unique_path
+from .base import CollectionTask
+
 """
 This file handles capturing of URLs and request/response metadata.
 We use an unpacked WARC format to make it easier to access underlying data files.
@@ -29,11 +32,36 @@ The resulting layout is:
   even if the original response was gzip encoded in transit.
 """
 
+@dataclass
+class UrlCollectionTask(CollectionTask):
+    """Collect URLs and request/response metadata."""
+    url: str
+    output: Path | None = None
+
+    def __post_init__(self):
+        """Validate the URL by attempting to prepare a request."""
+        requests.Request('GET', self.url).prepare()
+
+    def collect(self, files_dir: Path) -> None:
+        """
+        Capture URL to a WARC file using our custom FileWriter.
+        Appends to the WARC file if it already exists.
+        """
+        warc_path = files_dir.parent / 'headers.warc'
+        with open(warc_path, 'ab') as fh:
+            warc_writer = FileWriter(fh, warc_path, gzip=False)
+            with capture_http(warc_writer):
+                warc_writer.custom_out_path = self.output
+                requests.get(self.url)
+
+
 class FileWriter(WARCWriter):
     """
     A WARC writer that stores response bodies uncompressed in the files/ directory.
     """
     revisit_status_codes = set(['200', '203'])
+    custom_out_path = None  # override output path
+
     def __init__(self, filebuf, warc_path: Path, *args, **kwargs):
         super(WARCWriter, self).__init__(*args, **kwargs)
         self.out = filebuf
@@ -49,19 +77,23 @@ class FileWriter(WARCWriter):
             headers.replace_header('WARC-Type', 'revisit')
             
             ## get a filename for the response body
-            uri = headers.get_header('WARC-Target-URI')
-            parsed_url = urlparse(uri)
-            filename = Path(parsed_url.path.split('/')[-1])
-            # set stem
-            stem = filename.stem.lstrip('.') or 'data'
-            # set extension
-            extension = filename.suffix
-            if not extension:
-                if content_type := record.http_headers.get_header('Content-Type'):  # pragma: no branch
-                    extension = mimetypes.guess_extension(content_type.split(';')[0], strict=False)
-                if not extension:  
-                    extension = '.unknown'  # pragma: no cover
-            out_path = get_unique_path(self.files_path / f'{stem}{extension}')
+            if self.custom_out_path is not None:
+                out_path = self.custom_out_path
+            else:
+                uri = headers.get_header('WARC-Target-URI')
+                parsed_url = urlparse(uri)
+                filename = Path(parsed_url.path.split('/')[-1])
+                # set stem
+                stem = filename.stem.lstrip('.') or 'data'
+                # set extension
+                extension = filename.suffix
+                if not extension:
+                    if content_type := record.http_headers.get_header('Content-Type'):  # pragma: no branch
+                        extension = mimetypes.guess_extension(content_type.split(';')[0], strict=False)
+                    if not extension:  
+                        extension = '.unknown'  # pragma: no cover
+                out_path = f'{stem}{extension}'
+            out_path = get_unique_path(self.files_path / out_path)
             relative_path = out_path.relative_to(self.warc_path.parent)
 
             # add our custom WARC-Profile header
@@ -89,19 +121,6 @@ class FileWriter(WARCWriter):
                 headers.remove_header('WARC-Profile')
 
         return super()._write_warc_record(out, record)
-
-
-def capture(urls: list[str], warc_path: Path, request_kwargs: dict = {}) -> None:
-    """
-    Capture a list of URLs to a WARC file using our custom FileWriter.
-    Appends to the WARC file if it already exists.
-    """
-    use_gzip = str(warc_path).endswith('.gz')
-    with open(warc_path, 'ab') as fh:
-        warc_writer = FileWriter(fh, warc_path, gzip=use_gzip)
-        with capture_http(warc_writer):
-            for url in urls:
-                requests.get(url, **request_kwargs)
 
 def validate_warc_headers(headers_path: Path, error, warn, success) -> None:
     """

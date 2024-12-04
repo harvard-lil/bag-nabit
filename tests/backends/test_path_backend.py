@@ -1,7 +1,6 @@
 import pytest
-from pathlib import Path
 from warcio.archiveiterator import ArchiveIterator
-from nabit.lib.capture import capture
+from nabit.lib.backends.url import UrlCollectionTask
 
 
 @pytest.fixture
@@ -19,7 +18,7 @@ def capture_dir(tmp_path):
 def test_capture_with_content(capture_dir, server):
     """Test capturing a 200 response with body content"""
     
-    capture([server.url_for("/test.txt")], capture_dir["headers_path"])
+    UrlCollectionTask(url=server.url_for("/test.txt")).collect(capture_dir["files_dir"])
 
     # Check headers.warc
     with open(capture_dir["headers_path"], 'rb') as fh:
@@ -41,7 +40,7 @@ def test_capture_empty_response(capture_dir, server):
     # Add empty response to server
     server.expect_request("/empty").respond_with_data("")
     
-    capture([server.url_for("/empty")], capture_dir["headers_path"])
+    UrlCollectionTask(url=server.url_for("/empty")).collect(capture_dir["headers_path"])
 
     # Check headers.warc - should be a response record, not revisit
     with open(capture_dir["headers_path"], 'rb') as fh:
@@ -65,7 +64,7 @@ def test_capture_redirect(capture_dir, server):
         headers={"Location": target_url}
     )
 
-    capture([redirect_url], capture_dir["headers_path"])
+    UrlCollectionTask(url=redirect_url).collect(capture_dir["headers_path"])
 
     # Check headers.warc
     with open(capture_dir["headers_path"], 'rb') as fh:
