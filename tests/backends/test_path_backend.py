@@ -1,5 +1,6 @@
 from nabit.lib.backends.path import PathCollectionTask
-
+from inline_snapshot import snapshot
+from ..utils import filter_str
 
 def test_ds_store_ignored(tmp_path):
     """Test that files in ignore_patterns are ignored when copying directories"""
@@ -14,7 +15,23 @@ def test_ds_store_ignored(tmp_path):
     dest_dir.mkdir()
 
     # Test copying
-    PathCollectionTask(path=str(source_dir)).collect(dest_dir)
+    response = PathCollectionTask(path=str(source_dir)).collect(dest_dir)
+    assert filter_str(response, path=tmp_path) == snapshot("""\
+{
+  "request": {
+    "path": "<path>/test_dir",
+    "output": null,
+    "hard_links": false,
+    "ignore_patterns": [
+      ".DS_Store"
+    ]
+  },
+  "response": {
+    "path": "test_dir",
+    "success": true
+  }
+}\
+""")
 
     # Verify results
     assert not (dest_dir / "test_dir/.DS_Store").exists()

@@ -35,6 +35,8 @@ The resulting layout is:
 @dataclass
 class UrlCollectionTask(CollectionTask):
     """Collect URLs and request/response metadata."""
+    backend = 'url'
+
     url: str
     output: Path | None = None
 
@@ -44,7 +46,7 @@ class UrlCollectionTask(CollectionTask):
         """Validate the URL by attempting to prepare a request."""
         requests.Request('GET', self.url).prepare()
 
-    def collect(self, files_dir: Path) -> None:
+    def _collect(self, files_dir: Path) -> None:
         """
         Capture URL to a WARC file using our custom FileWriter.
         Appends to the WARC file if it already exists.
@@ -55,6 +57,15 @@ class UrlCollectionTask(CollectionTask):
             with capture_http(warc_writer):
                 warc_writer.custom_out_path = self.output
                 requests.get(self.url, timeout=self.timeout)
+        return {'path': str(warc_writer.result_path)}
+    
+    def request_dict(self) -> dict:
+        """Return a dictionary representation of the request."""
+        return {
+            'url': self.url,
+            'output': str(self.output) if self.output else None,
+            'timeout': self.timeout,
+        }
 
 
 class FileWriter(WARCWriter):
@@ -63,6 +74,7 @@ class FileWriter(WARCWriter):
     """
     revisit_status_codes = set(['200', '203'])
     custom_out_path = None  # override output path
+    result_path = None
 
     def __init__(self, filebuf, warc_path: Path, *args, **kwargs):
         super(WARCWriter, self).__init__(*args, **kwargs)
@@ -97,6 +109,7 @@ class FileWriter(WARCWriter):
                 out_path = f'{stem}{extension}'
             out_path = get_unique_path(self.files_path / out_path)
             relative_path = out_path.relative_to(self.warc_path.parent)
+            self.result_path = out_path.relative_to(self.files_path)
 
             # add our custom WARC-Profile header
             headers.add_header('WARC-Profile', f'file-content; filename="{relative_path}"')
@@ -136,9 +149,6 @@ def validate_warc_headers(headers_path: Path, error, warn, success) -> None:
     data_path = headers_path.parent
     files_path = data_path / "files"
     
-    # make sure there are files in files_path
-    if not files_path.exists() or not any(files_path.iterdir()):
-        error("No files in data/files")
     if not headers_path.exists():
         warn("No headers.warc found; archive lacks request and response metadata")
     else:

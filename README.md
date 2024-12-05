@@ -156,6 +156,9 @@ Options:
   -t, --timestamp <tsa_keyword> | <cert_chain>:<url>
                                   Timestamp using either a TSA keyword or a
                                   cert chain path and URL (can be repeated)
+  --timeout FLOAT                 Timeout for collection tasks (default: 5.0)
+  --collect-errors [fail|ignore]  How to handle collection task errors
+                                  (default: fail)
   --help                          Show this message and exit.
 ```
 

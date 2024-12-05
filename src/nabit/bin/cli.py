@@ -6,7 +6,7 @@ from pathlib import Path
 from .utils import assert_file_exists, assert_url, cli_validate, CaptureCommand
 from ..lib.archive import package
 from ..lib.sign import KNOWN_TSAS
-from ..lib.backends.base import CollectionTask
+from ..lib.backends.base import CollectionTask, CollectionError
 from ..lib.backends.path import PathCollectionTask
 
 @click.group()
@@ -39,6 +39,10 @@ def main():
             help='Timestamp using either a TSA keyword or a cert chain path and URL (can be repeated)',
             metavar='<tsa_keyword> | <cert_chain>:<url>',
             )
+@click.option('--timeout', type=float, default=5.0,
+            help='Timeout for collection tasks (default: 5.0)')
+@click.option('--collect-errors', type=click.Choice(['fail', 'ignore']), default='fail',
+              help='How to handle collection task errors (default: fail)')
 @click.pass_context
 def archive(
     ctx,
@@ -53,7 +57,9 @@ def archive(
     unsigned_metadata_path,
     signed_metadata_json,
     unsigned_metadata_json,
-    signature_args
+    signature_args,
+    collect_errors,
+    timeout,
 ):
     """
     Archive files and URLs into a BagIt package.
@@ -128,7 +134,10 @@ def archive(
     processed_collect = []
     for task in collect:
         try:
-            processed_collect.append(CollectionTask.from_dict(task))
+            task = CollectionTask.from_dict(task)
+            if hasattr(task, 'timeout'):
+                task.timeout = timeout
+            processed_collect.append(task)
         except Exception as e:
             raise click.BadParameter(f'Invalid task definition for --collect: {task} resulted in {e}')
 
@@ -173,16 +182,19 @@ def archive(
 
     click.echo(f"Creating package at {bag_path} ...")
 
-    package(
-        output_path=bag_path,
+    try:
+        package(
+            output_path=bag_path,
         collect=processed_collect,
         bag_info=bag_info,
         signatures=signatures,
         signed_metadata=metadata['signed'],
         unsigned_metadata=metadata['unsigned'],
         amend=amend,
-        use_hard_links=hard_link,
-    )
+            collect_errors=collect_errors,
+        )
+    except CollectionError as e:
+        raise click.BadParameter(f'Collection task failed: {e}')
 
     cli_validate(bag_path)
     

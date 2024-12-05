@@ -4,12 +4,13 @@ import bagit
 import os
 import hashlib
 import json
-
+import uuid
 from .utils import noop
 from .backends.url import validate_warc_headers
 from .sign import validate_signatures, KNOWN_TSAS, add_signatures
 from .. import __version__
-from .backends.base import CollectionTask
+from .backends.base import CollectionTask, CollectionError
+from typing import Literal
 
 
 def validate_bag_format(bag_path: Path, error, warn, success) -> None:
@@ -27,6 +28,13 @@ def validate_bag_format(bag_path: Path, error, warn, success) -> None:
 
 def validate_data_files(bag_path: Path, error = None, warn = noop, success = noop) -> None:
     """Validate only expected files are present in data/."""
+
+    # make sure there are files in files_path
+    files_path = bag_path / "data/files"
+    if not files_path.exists() or not any(files_path.iterdir()):
+        warn("No files in data/files")
+
+    # make sure only expected files are present
     expected_files = set(['files', 'headers.warc', 'signed-metadata.json'])
     actual_files = set(f.name for f in bag_path.glob('data/*'))
     unexpected_files = actual_files - expected_files
@@ -61,7 +69,7 @@ def package(
     signatures: list[dict] | None = None,
     signed_metadata: dict | None = None,
     unsigned_metadata: dict | None = None,
-    use_hard_links: bool = False,
+    collect_errors: Literal['fail', 'ignore'] = 'fail',
 ) -> None:
     """
     Create a BagIt package.
@@ -79,15 +87,32 @@ def package(
     data_path = output_path / 'data'
     files_path = data_path / 'files'
     files_path.mkdir(exist_ok=True, parents=True)
+    signed_metadata_path = data_path / "signed-metadata.json"
 
+    # set or extend signed metadata
+    if signed_metadata is None:
+        if signed_metadata_path.exists():
+            signed_metadata = json.loads(signed_metadata_path.read_text())
+        else:
+            signed_metadata = {}
+    
+    if not signed_metadata.get('id'):
+        signed_metadata['id'] = str(uuid.uuid4())
+
+    # run collection tasks and record results
     if collect:
+        results = []
         for task in collect:
-            task.collect(files_path)
+            result = task.collect(files_path)
+            if collect_errors == 'fail' and not result['response']['success']:
+                raise CollectionError(f"Collection task failed: {result}")
+            results.append(result)
+        signed_metadata.setdefault('collection_tasks', []).extend(results)
 
     # Add metadata files
-    if signed_metadata is not None:
+    if signed_metadata:
         (data_path / "signed-metadata.json").write_text(json.dumps(signed_metadata, indent=2))
-    if unsigned_metadata is not None:
+    if unsigned_metadata:
         (output_path / "unsigned-metadata.json").write_text(json.dumps(unsigned_metadata, indent=2))
     
     ## add bag files

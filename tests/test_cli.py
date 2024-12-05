@@ -5,8 +5,7 @@ import json
 import re
 import pytest
 
-from tests.utils import validate_passing
-from .utils import validate_passing, validate_failing
+from .utils import validate_passing, validate_failing, filter_str
 
 ### helpers
 
@@ -111,8 +110,8 @@ WARNING: No timestamps found\
 """)
 
     # check metadata files
-    assert json.loads((bag_path / 'unsigned-metadata.json').read_text()) == {'metadata': 'unsigned'}
-    assert json.loads((bag_path / 'data/signed-metadata.json').read_text()) == {'metadata': 'signed'}
+    assert json.loads((bag_path / 'unsigned-metadata.json').read_text())['metadata'] == 'unsigned'
+    assert json.loads((bag_path / 'data/signed-metadata.json').read_text())['metadata'] == 'signed'
 
     # check bag-info.txt metadata
     bag_info = (bag_path / 'bag-info.txt').read_text()
@@ -345,6 +344,13 @@ def test_collect_json(runner, tmp_path, server):
     assert (bag_path / 'data/files/data.html').read_text() == 'root content'
     assert (bag_path / 'data/files/custom.html').read_text() == 'another content'
 
+def test_empty_package(runner, tmp_path):
+    """Test creating a package with no content"""
+    run(runner, [
+        'archive',
+        str(tmp_path),
+    ])
+
 ## validation errors
 
 def test_invalid_metadata_file_extension(runner, tmp_path):
@@ -431,13 +437,6 @@ def test_invalid_url(runner, tmp_path):
         '-u', 'not_a_url',
     ], exit_code=2, output='Invalid URL')
 
-def test_empty_package(runner, tmp_path):
-    """Test creating a package with no content"""
-    run(runner, [
-        'archive',
-        str(tmp_path),
-    ], exit_code=1, output='No files in data/files')
-
 def test_invalid_collect_json(runner, tmp_path):
     """Test error handling for invalid --collect JSON"""
     # Test invalid JSON syntax
@@ -460,3 +459,44 @@ def test_invalid_collect_json(runner, tmp_path):
         str(tmp_path / 'bag'),
         '--collect', '[{"backend": "invalid"}]'
     ], exit_code=2, output='Invalid task definition for --collect')
+
+def test_collect_errors_fail(runner, tmp_path):
+    """Test --collect-errors=fail with a non-resolving URL"""
+    bag_path = tmp_path / 'bag'
+    non_resolving_url = 'http://nonexistent.local'
+
+    result = run(runner, [
+        'archive',
+        str(bag_path),
+        '--collect-errors', 'fail',
+        '-u', non_resolving_url,
+    ], exit_code=2, output='Max retries exceeded')
+
+def test_collect_errors_ignore(runner, tmp_path):
+    """Test --collect-errors=ignore with a non-resolving URL"""
+    bag_path = tmp_path / 'bag'
+    non_resolving_url = 'http://nonexistent.local'
+
+    result = run(runner, [
+        'archive',
+        str(bag_path),
+        '--collect-errors', 'ignore',
+        '-u', non_resolving_url,
+    ], output='Package created')
+
+    collection_tasks = json.loads((bag_path / 'data/signed-metadata.json').read_text())['collection_tasks']
+    assert filter_str(collection_tasks) == snapshot("""\
+[
+  {
+    "request": {
+      "url": "http://nonexistent.local",
+      "output": null,
+      "timeout": 5.0
+    },
+    "response": {
+      "success": false,
+      "error": "HTTPConnectionPool(host='nonexistent.local', port=80): Max retries exceeded with url: / (Caused by NameResolutionError(\\"<urllib3.connection.HTTPConnection object at <hex>>: Failed to resolve 'nonexistent.local' ([Errno 8] nodename nor servname provided, or not known)\\"))"
+    }
+  }
+]\
+""")

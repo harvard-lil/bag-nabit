@@ -3,7 +3,8 @@ from warcio.archiveiterator import ArchiveIterator
 from nabit.lib.backends.url import UrlCollectionTask
 import requests
 from time import sleep
-
+from inline_snapshot import snapshot
+from ..utils import filter_str
 
 @pytest.fixture
 def capture_dir(tmp_path):
@@ -20,9 +21,21 @@ def capture_dir(tmp_path):
 def test_capture_with_content(capture_dir, server):
     """Test capturing a 200 response with body content"""
     
-    UrlCollectionTask(url=server.url_for("/test.txt")).collect(capture_dir["files_dir"])
+    response = UrlCollectionTask(url=server.url_for("/test.txt")).collect(capture_dir["files_dir"])
+    assert filter_str(response, port=server.port) == snapshot("""\
+{
+  "request": {
+    "url": "http://localhost:<port>/test.txt",
+    "output": null,
+    "timeout": 5.0
+  },
+  "response": {
+    "path": "test.txt",
+    "success": true
+  }
+}\
+""")
 
-    # Check headers.warc
     with open(capture_dir["headers_path"], 'rb') as fh:
         records = list(ArchiveIterator(fh))
         assert len(records) == 2  # request and response
@@ -42,7 +55,20 @@ def test_capture_empty_response(capture_dir, server):
     # Add empty response to server
     server.expect_request("/empty").respond_with_data("")
     
-    UrlCollectionTask(url=server.url_for("/empty")).collect(capture_dir["headers_path"])
+    response = UrlCollectionTask(url=server.url_for("/empty")).collect(capture_dir["headers_path"])
+    assert filter_str(response, port=server.port) == snapshot("""\
+{
+  "request": {
+    "url": "http://localhost:<port>/empty",
+    "output": null,
+    "timeout": 5.0
+  },
+  "response": {
+    "path": "empty.txt",
+    "success": true
+  }
+}\
+""")
 
     # Check headers.warc - should be a response record, not revisit
     with open(capture_dir["headers_path"], 'rb') as fh:
@@ -66,7 +92,20 @@ def test_capture_redirect(capture_dir, server):
         headers={"Location": target_url}
     )
 
-    UrlCollectionTask(url=redirect_url).collect(capture_dir["headers_path"])
+    response = UrlCollectionTask(url=redirect_url).collect(capture_dir["headers_path"])
+    assert filter_str(response, port=server.port) == snapshot("""\
+{
+  "request": {
+    "url": "http://localhost:<port>/redirect",
+    "output": null,
+    "timeout": 5.0
+  },
+  "response": {
+    "path": "test.txt",
+    "success": true
+  }
+}\
+""")
 
     # Check headers.warc
     with open(capture_dir["headers_path"], 'rb') as fh:
@@ -92,6 +131,17 @@ def test_capture_redirect(capture_dir, server):
 def test_capture_timeout(capture_dir, server):
     """Test that requests timeout after the specified duration"""
     server.expect_request("/slow").respond_with_handler(lambda req: sleep(.2))
-    task = UrlCollectionTask(url=server.url_for("/slow"), timeout=0.1)
-    with pytest.raises(requests.exceptions.Timeout):
-        task.collect(capture_dir["files_dir"])
+    response = UrlCollectionTask(url=server.url_for("/slow"), timeout=0.1).collect(capture_dir["files_dir"])
+    assert filter_str(response, port=server.port) == snapshot("""\
+{
+  "request": {
+    "url": "http://localhost:<port>/slow",
+    "output": null,
+    "timeout": 0.1
+  },
+  "response": {
+    "success": false,
+    "error": "HTTPConnectionPool(host='localhost', port=<port>): Read timed out. (read timeout=0.1)"
+  }
+}\
+""")

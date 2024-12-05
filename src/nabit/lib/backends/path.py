@@ -8,6 +8,8 @@ from .base import CollectionTask
 @dataclass
 class PathCollectionTask(CollectionTask):
     """Collect files or directories from the local filesystem."""
+    backend = 'path'
+
     path: Path
     output: Path | None = None
     hard_links: bool = False
@@ -22,7 +24,7 @@ class PathCollectionTask(CollectionTask):
         if self.output is not None:
             self.output = Path(self.output)  # Also coerce output if provided
 
-    def collect(self, files_dir: Path) -> None:
+    def _collect(self, files_dir: Path) -> Path:
         """Copy paths to a destination directory, optionally using hard links."""
         path = self.path
         dest_path = get_unique_path(files_dir / path.name)
@@ -43,3 +45,13 @@ class PathCollectionTask(CollectionTask):
                 copy_function=copy_function,
                 ignore=shutil.ignore_patterns(*self.ignore_patterns)
             )
+        return {'path': str(dest_path.relative_to(files_dir))}
+
+    def request_dict(self) -> dict:
+        """Return a dictionary representation of the request."""
+        return {
+            'path': str(self.path),
+            'output': str(self.output) if self.output else None,
+            'hard_links': self.hard_links,
+            'ignore_patterns': self.ignore_patterns,
+        }

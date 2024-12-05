@@ -1,4 +1,5 @@
 from click.testing import CliRunner
+import json
 import pytest
 from pytest_httpserver import HTTPServer
 
@@ -31,8 +32,8 @@ def test_bag(tmp_path, test_files):
             PathCollectionTask(path=str(test_files["payload"][0])),
             PathCollectionTask(path=str(test_files["payload"][1]))
         ],
-        signed_metadata=test_files["signed_metadata"].read_text(),
-        unsigned_metadata=test_files["unsigned_metadata"].read_text(),
+        signed_metadata=json.loads(test_files["signed_metadata"].read_text()),
+        unsigned_metadata=json.loads(test_files["unsigned_metadata"].read_text()),
         bag_info={"Source-Organization": "Test Org"}
     )
     return bag_path
@@ -69,8 +70,8 @@ def signed_bag(tmp_path, test_files, root_ca):
             PathCollectionTask(path=str(test_files["payload"][0])),
             PathCollectionTask(path=str(test_files["payload"][1]))
         ],
-        signed_metadata=test_files["signed_metadata"].read_text(),
-        unsigned_metadata=test_files["unsigned_metadata"].read_text(),
+        signed_metadata=json.loads(test_files["signed_metadata"].read_text()),
+        unsigned_metadata=json.loads(test_files["unsigned_metadata"].read_text()),
         bag_info={"Source-Organization": "Test Org"},
         signatures=[
             {
