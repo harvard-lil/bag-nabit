@@ -1,5 +1,6 @@
 from nabit.bin.cli import main
 from nabit.lib.sign import KNOWN_TSAS
+from nabit.lib.backends.path import PathCollectionTask
 from inline_snapshot import snapshot
 import json
 import re
@@ -460,42 +461,53 @@ def test_invalid_collect_json(runner, tmp_path):
         '--collect', '[{"backend": "invalid"}]'
     ], exit_code=2, output='Invalid task definition for --collect')
 
-def test_collect_errors_fail(runner, tmp_path):
+def test_collect_errors_fail(runner, tmp_path, monkeypatch):
     """Test --collect-errors=fail with a non-resolving URL"""
     bag_path = tmp_path / 'bag'
-    non_resolving_url = 'http://nonexistent.local'
+    
+    # patch backends.path.PathCollectionTask._collect to raise an exception
+    def mock_collect(self, *args, **kwargs):
+        raise ValueError("collection failed")
+    monkeypatch.setattr(PathCollectionTask, '_collect', mock_collect)
 
     result = run(runner, [
         'archive',
         str(bag_path),
         '--collect-errors', 'fail',
-        '-u', non_resolving_url,
-    ], exit_code=2, output='Max retries exceeded')
+        '-p', tmp_path,
+    ], exit_code=2, output='collection failed')
 
-def test_collect_errors_ignore(runner, tmp_path):
+def test_collect_errors_ignore(runner, tmp_path, monkeypatch):
     """Test --collect-errors=ignore with a non-resolving URL"""
     bag_path = tmp_path / 'bag'
-    non_resolving_url = 'http://nonexistent.local'
+    
+    # patch backends.path.PathCollectionTask._collect to raise an exception
+    def mock_collect(self, *args, **kwargs):
+        raise ValueError("collection failed")
+    monkeypatch.setattr(PathCollectionTask, '_collect', mock_collect)
 
     result = run(runner, [
         'archive',
         str(bag_path),
         '--collect-errors', 'ignore',
-        '-u', non_resolving_url,
+        '-p', tmp_path,
     ], output='Package created')
 
     collection_tasks = json.loads((bag_path / 'data/signed-metadata.json').read_text())['collection_tasks']
-    assert filter_str(collection_tasks) == snapshot("""\
+    assert filter_str(collection_tasks, path=tmp_path) == snapshot("""\
 [
   {
     "request": {
-      "url": "http://nonexistent.local",
+      "path": "<path>",
       "output": null,
-      "timeout": 5.0
+      "hard_links": false,
+      "ignore_patterns": [
+        ".DS_Store"
+      ]
     },
     "response": {
       "success": false,
-      "error": "HTTPConnectionPool(host='nonexistent.local', port=80): Max retries exceeded with url: / (Caused by NameResolutionError(\\"<urllib3.connection.HTTPConnection object at <hex>>: Failed to resolve 'nonexistent.local' ([Errno 8] nodename nor servname provided, or not known)\\"))"
+      "error": "collection failed"
     }
   }
 ]\

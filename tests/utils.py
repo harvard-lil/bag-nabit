@@ -43,7 +43,9 @@ def filter_str(obj, **kwargs):
     Helpful for consistent comparisons in assertions.
     """
     out = json.dumps(obj, indent=2, default=str)
-    out = re.sub(r'object at 0x[0-9a-f]+', 'object at <hex>', out)
     for key, value in kwargs.items():
-        out = out.replace(str(value), f"<{key}>")
+        if isinstance(value, re.Pattern):
+            out = value.sub(f"<{key}>", out)
+        else:
+            out = out.replace(str(value), f"<{key}>")
     return out
