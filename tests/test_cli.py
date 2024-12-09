@@ -12,7 +12,7 @@ from .utils import validate_passing, validate_failing, filter_str
 
 def run(runner, args, exit_code=0, output="Package created"):
     result = runner.invoke(main, args, catch_exceptions=False)
-    assert result.exit_code == exit_code
+    assert result.exit_code == exit_code, f"Expected exit code {exit_code}, got {result.exit_code} with output: {result.output}"
     if output:
         assert output in result.output
     return result
@@ -77,7 +77,7 @@ SUCCESS: bag format is valid
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
-    assert (bag_path / 'data/files/data.html').read_text() == 'root content' 
+    assert (bag_path / 'data/files/localhost.html').read_text() == 'root content' 
     assert (bag_path / 'data/files/another.html').read_text() == 'another content'
     assert (bag_path / 'data/files/test.txt').read_text() == 'test content'
 
@@ -287,19 +287,17 @@ def test_duplicate_file_names(runner, tmp_path, server):
     bag_path = tmp_path / 'bag'
 
     # Create two files with the same name in different directories
-    dir1 = tmp_path / "dir1"
-    dir2 = tmp_path / "dir2"
-    dir1.mkdir()
-    dir2.mkdir()
-    (dir1 / "data.html").write_text("content1")
-    (dir2 / "data.html").write_text("content2")
+    (tmp_path / "data.html").write_text("content1")
+    (tmp_path / "data2.html").write_text("content2")
+    server.expect_request("/data.html").respond_with_data("content3", content_type="text/html")
+
 
     run(runner, [
         'archive',
         str(bag_path),
-        '-p', str(dir1 / "data.html"),
-        '-p', str(dir2 / "data.html"),
-        '-u', server.url_for("/"),
+        '-p', str(tmp_path / "data.html"),
+        '-p', f'{{"path": "{tmp_path / "data2.html"}", "output": "data.html"}}',
+        '-u', server.url_for("/data.html"),
     ])
 
     # Verify files exist; one will be data.html and the others will be data-a1b2c3.html
@@ -342,7 +340,7 @@ def test_collect_json(runner, tmp_path, server):
         '--collect', json.dumps(collect_tasks)
     ])
     
-    assert (bag_path / 'data/files/data.html').read_text() == 'root content'
+    assert (bag_path / 'data/files/localhost.html').read_text() == 'root content'
     assert (bag_path / 'data/files/custom.html').read_text() == 'another content'
 
 def test_empty_package(runner, tmp_path):

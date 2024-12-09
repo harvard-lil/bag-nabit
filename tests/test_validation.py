@@ -51,12 +51,12 @@ WARNING: No timestamps found\
 """)
 
 def test_missing_warc_file(warc_bag):
-    (warc_bag / "data/files/data.html").unlink()
+    (warc_bag / "data/files/localhost.html").unlink()
     assert validate_failing(warc_bag) == snapshot("""\
 SUCCESS: headers.warc found
-ERROR: headers.warc specifies files that do not exist in data/files. Example: files/data.html
+ERROR: headers.warc specifies files that do not exist in data/files. Example: files/localhost.html
 WARNING: No files in data/files
-ERROR: bag format is invalid: Bag validation failed: data/files/data.html exists in manifest but was not found on filesystem
+ERROR: bag format is invalid: Bag validation failed: data/files/localhost.html exists in manifest but was not found on filesystem
 WARNING: Cannot verify the validity of empty directories: <bag_path>/data/files
 WARNING: No signatures found
 WARNING: No timestamps found\

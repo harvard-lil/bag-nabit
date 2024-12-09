@@ -6,6 +6,7 @@ import mimetypes
 from pathlib import Path
 import requests
 import os
+import re
 from dataclasses import dataclass
 from ..utils import get_unique_path
 from .base import CollectionTask
@@ -42,6 +43,10 @@ class UrlCollectionTask(CollectionTask):
 
     timeout: float = 5.0
 
+    # if content type matches this string, use the given extension
+    # instead of the extension in the URL path
+    content_type_overrides = {"text/html": ".html"}
+
     def __post_init__(self):
         """Validate the URL by attempting to prepare a request."""
         requests.Request('GET', self.url).prepare()
@@ -76,12 +81,13 @@ class FileWriter(WARCWriter):
     custom_out_path = None  # override output path
     result_path = None
 
-    def __init__(self, filebuf, warc_path: Path, *args, **kwargs):
+    def __init__(self, filebuf, warc_path: Path, content_type_overrides: dict[str, str] = {}, *args, **kwargs):
         super(WARCWriter, self).__init__(*args, **kwargs)
         self.out = filebuf
         self.warc_path = Path(warc_path)
         self.files_path = self.warc_path.parent / 'files'
         self.files_path.mkdir(exist_ok=True)
+        self.content_type_overrides = content_type_overrides
 
     def _write_warc_record(self, out, record):
         if record.rec_type == 'response' and record.http_headers and record.http_headers.get_statuscode() in self.revisit_status_codes:
@@ -92,22 +98,14 @@ class FileWriter(WARCWriter):
             
             ## get a filename for the response body
             if self.custom_out_path is not None:
-                out_path = self.custom_out_path
+                out_name = self.custom_out_path
             else:
-                uri = headers.get_header('WARC-Target-URI')
-                parsed_url = urlparse(uri)
-                filename = Path(parsed_url.path.split('/')[-1])
-                # set stem
-                stem = filename.stem.lstrip('.') or 'data'
-                # set extension
-                extension = filename.suffix
-                if not extension:
-                    if content_type := record.http_headers.get_header('Content-Type'):  # pragma: no branch
-                        extension = mimetypes.guess_extension(content_type.split(';')[0], strict=False)
-                    if not extension:  
-                        extension = '.unknown'  # pragma: no cover
-                out_path = f'{stem}{extension}'
-            out_path = get_unique_path(self.files_path / out_path)
+                out_name = url_to_filename(
+                    headers.get_header('WARC-Target-URI'),
+                    record.http_headers.get_header('Content-Type'),
+                    self.content_type_overrides
+                )
+            out_path = get_unique_path(self.files_path / out_name)
             relative_path = out_path.relative_to(self.warc_path.parent)
             self.result_path = out_path.relative_to(self.files_path)
 
@@ -176,3 +174,57 @@ def validate_warc_headers(headers_path: Path, error, warn, success) -> None:
             if file not in headers_files:
                 warn(f"Some files in data/files are not specified in headers.warc. Example: {file}")
                 break
+
+def url_to_filename(url: str, content_type: str | None = None, content_type_overrides: dict[str, str] = {}) -> str:
+    """
+    Convert a URL to a filename based on the URL path and content type.
+
+    >>> url_to_filename('https://example.com/path/to/file.pdf')
+    'file.pdf'
+    >>> url_to_filename('https://sub.example.com/', 'text/html')
+    'sub_example_com.html'
+    >>> url_to_filename('https://example.com/foo', 'fake/content-type')
+    'foo.unknown'
+    >>> url_to_filename('https://example.com/page', 'text/html')
+    'page.html'
+    >>> url_to_filename('https://example.com/image', 'image/jpeg')
+    'image.jpg'
+    >>> url_to_filename('https://example.com/path/', 'text/plain')
+    'path.txt'
+    >>> url_to_filename('https://example.com/page.php', 'text/html')
+    'page.php'
+    >>> url_to_filename('https://example.com/page.php', 'text/html; charset=utf-8', {'text/html': '.html'})
+    'page.html'
+    >>> url_to_filename('https://example.com/page.html?foo=bar')
+    'page.html'
+    >>> url_to_filename('https://127.0.0.1:8080/', 'text/html')
+    '127_0_0_1.html'
+    >>> url_to_filename('https://example.com/..', 'text/html')
+    'dot_.html'
+    >>> url_to_filename('https://example.com/.html', 'text/html')
+    'dot_html.html'
+    """
+    parsed_url = urlparse(url)
+    if parsed_url.path.strip('/'):
+        filename = parsed_url.path.rstrip('/').split('/')[-1]
+    else:
+        filename = parsed_url.hostname.replace('.', '_')
+    filename = Path(filename)
+
+    # set stem
+    stem = filename.stem
+    stem = re.sub(r'^\.+', 'dot_', stem)
+
+    # set extension
+    extension = None
+    content_type = (content_type or '').split(';')[0]  # strip content types like "text/html; charset=utf-8"
+    if content_type in content_type_overrides:
+        extension = content_type_overrides[content_type]
+    elif filename.suffix:
+        extension = filename.suffix
+    elif content_type:
+        extension = mimetypes.guess_extension(content_type, strict=False)
+    if not extension:
+        extension = '.unknown'
+    
+    return f'{stem}{extension}'
