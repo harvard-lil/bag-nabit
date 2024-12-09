@@ -214,6 +214,14 @@ In many situations it may make sense to create and sign bags on different machin
   ```
 * The signed bag is then published to the archive, perhaps simply by copying the bag directory to a public file server.
 
+### Security warning: collecting untrusted URLs
+
+It is not recommended to collect URLs from untrusted sources without validating their destination.
+
+`bag-nabit` currently WILL capture URLs that point to local IP addresses, such as localhost or the local network.
+This is a security risk, as it may allow an attacker to capture sensitive data from local networks, especially on
+cloud hosting where known URLs may share sensitive configuration data.
+
 Collection backends
 -------------------
 
