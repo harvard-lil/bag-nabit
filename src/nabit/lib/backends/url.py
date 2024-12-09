@@ -58,7 +58,7 @@ class UrlCollectionTask(CollectionTask):
         """
         warc_path = files_dir.parent / 'headers.warc'
         with open(warc_path, 'ab') as fh:
-            warc_writer = FileWriter(fh, warc_path, gzip=False)
+            warc_writer = FileWriter(fh, warc_path, gzip=False, content_type_overrides=self.content_type_overrides)
             with capture_http(warc_writer):
                 warc_writer.custom_out_path = self.output
                 requests.get(self.url, timeout=self.timeout)
