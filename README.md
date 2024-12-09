@@ -135,8 +135,10 @@ Options:
   -u, --url TEXT                  URL to archive (can be repeated). May be a
                                   bare url or a JSON dict with a "url" key and
                                   an optional "output" key
-  -p, --path PATH                 File or directory to archive (can be
-                                  repeated)
+  -p, --path TEXT                 File or directory to archive (can be
+                                  repeated). May be a bare path or a JSON dict
+                                  with a "path" key and an optional "output"
+                                  key
   -c, --collect TEXT              Collection tasks in JSON format
   --hard-link                     Use hard links when copying files (when
                                   possible)

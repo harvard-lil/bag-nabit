@@ -27,7 +27,8 @@ class PathCollectionTask(CollectionTask):
     def _collect(self, files_dir: Path) -> Path:
         """Copy paths to a destination directory, optionally using hard links."""
         path = self.path
-        dest_path = get_unique_path(files_dir / path.name)
+        dest_name = self.output or path.name
+        dest_path = get_unique_path(files_dir / dest_name)
         # can only use hard links if source and destination are on the same device
         use_hard_links = self.hard_links and os.stat(path).st_dev == os.stat(files_dir).st_dev
         if path.is_file():

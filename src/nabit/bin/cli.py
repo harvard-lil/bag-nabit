@@ -19,7 +19,7 @@ def main():
 @click.argument('bag_path', type=click.Path(path_type=Path))
 @click.option('--amend', '-a', is_flag=True, help='Update an existing archive. May add OR OVERWRITE existing data.')
 @click.option('--url', '-u', 'urls', multiple=True, help='URL to archive (can be repeated). May be a bare url or a JSON dict with a "url" key and an optional "output" key')
-@click.option('--path', '-p', 'paths', multiple=True, type=click.Path(exists=True, path_type=Path), help='File or directory to archive (can be repeated)')
+@click.option('--path', '-p', 'paths', multiple=True, help='File or directory to archive (can be repeated). May be a bare path or a JSON dict with a "path" key and an optional "output" key')
 @click.option('--collect', '-c', 'collect', help='Collection tasks in JSON format')
 @click.option('--hard-link', is_flag=True, help='Use hard links when copying files (when possible)')
 @click.option('--info', '-i', multiple=True, help='bag-info.txt metadata in key:value format (can be repeated)')
@@ -128,7 +128,12 @@ def archive(
             url_dict = {'backend': 'url', 'url': url}
         collect.append(url_dict)
     for path in paths:
-        collect.append({'backend': 'path', 'path': str(path)})
+        try:
+            path_dict = json.loads(path)
+            path_dict['backend'] = 'path'
+        except json.JSONDecodeError:
+            path_dict = {'backend': 'path', 'path': str(path)}
+        collect.append(path_dict)
 
     # Process and validate collect
     processed_collect = []
