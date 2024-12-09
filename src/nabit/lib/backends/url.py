@@ -8,7 +8,7 @@ import requests
 import os
 import re
 from dataclasses import dataclass
-from ..utils import get_unique_path
+from ..utils import get_unique_path, is_url
 from .base import CollectionTask
 
 """
@@ -48,8 +48,9 @@ class UrlCollectionTask(CollectionTask):
     content_type_overrides = {"text/html": ".html"}
 
     def __post_init__(self):
-        """Validate the URL by attempting to prepare a request."""
-        requests.Request('GET', self.url).prepare()
+        """Validate the URL."""
+        if not is_url(self.url):
+            raise ValueError(f"Invalid URL: {self.url}")
 
     def _collect(self, files_dir: Path) -> None:
         """

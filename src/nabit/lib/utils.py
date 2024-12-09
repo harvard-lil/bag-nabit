@@ -1,6 +1,7 @@
 import random
 import string
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 def get_unique_path(path: Path) -> Path:
@@ -15,3 +16,8 @@ def get_unique_path(path: Path) -> Path:
 def noop(*args, **kwargs):
     """Default callback function that does nothing."""
     pass  # pragma: no cover
+
+def is_url(value: str) -> bool:
+    """Check if a string is a valid URL."""
+    parsed = urlparse(value)
+    return parsed.scheme in ['http', 'https'] and parsed.netloc

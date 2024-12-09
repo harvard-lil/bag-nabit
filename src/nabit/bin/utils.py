@@ -1,17 +1,14 @@
-from urllib.parse import urlparse
 import click
-import requests
 from ..lib.archive import validate_package
+from ..lib.utils import is_url
 
 
 def assert_file_exists(path):
     click.Path(exists=True, path_type=str, dir_okay=False)(path)
 
 def assert_url(url):
-    try:
-        requests.Request('GET', url).prepare()
-    except requests.RequestException as e:
-        raise click.BadParameter(str(e))
+    if not is_url(url):
+        raise click.BadParameter(f"Invalid URL: {url}")
     
 def cli_validate(bag_path):
     """
