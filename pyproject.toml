@@ -1,6 +1,6 @@
 [project]
 name = "nabit"
-version = "0.1.0"
+version = "0.1.1"
 description = "Archive and sign datasets"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,8 +28,8 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=nabit --cov-report=term-missing"
-testpaths = ["tests"]
+addopts = "--cov=nabit --cov-report=term-missing --doctest-modules"
+testpaths = ["tests", "src"]
 
 [tool.coverage.run]
 source = ["nabit"]
