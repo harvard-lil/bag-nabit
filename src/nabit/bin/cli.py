@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .utils import assert_file_exists, assert_url, cli_validate, CaptureCommand
 from ..lib.archive import package
-from ..lib.sign import KNOWN_TSAS
+from ..lib.sign import KNOWN_TSAS, is_encrypted_key
 from ..lib.backends.base import CollectionTask, CollectionError
 from ..lib.backends.path import PathCollectionTask
 
@@ -166,9 +166,12 @@ def archive(
                 raise click.BadParameter(f'Sign must be in "cert_chain:key_file" format, got "{value}"')
             assert_file_exists(key)
             assert_file_exists(cert_chain)
+            params = {'key': key, 'cert_chain': cert_chain}
+            if is_encrypted_key(key):
+                params['password'] = click.prompt(f'Enter password for {key}', hide_input=True)
             signatures.append({
                 'action': 'sign',
-                'params': {'key': key, 'cert_chain': cert_chain},
+                'params': params,
             })
         else:
             # Convert timestamp list of "<tsa_keyword> | <url>:<cert_chain>" strings into a list of timestamp operations

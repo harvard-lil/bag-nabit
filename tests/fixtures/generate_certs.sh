@@ -41,6 +41,9 @@ keyUsage=critical,digitalSignature,keyCertSign,cRLSign")
 # Generate ECDSA private key for domain signing certificate
 openssl ecparam -name prime256v1 -genkey -noout -out tests/fixtures/pki/domain-signing.key
 
+# Create encrypted version of domain signing key (PKCS#8 format)
+openssl pkcs8 -topk8 -in tests/fixtures/pki/domain-signing.key -out tests/fixtures/pki/domain-signing-enc.key -passout pass:password
+
 # Create CSR for domain signing certificate
 openssl req -new \
   -key tests/fixtures/pki/domain-signing.key \

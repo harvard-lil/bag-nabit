@@ -5,13 +5,12 @@ from inline_snapshot import snapshot
 import json
 import re
 import pytest
-
 from .utils import validate_passing, validate_failing, filter_str
 
 ### helpers
 
-def run(runner, args, exit_code=0, output="Package created"):
-    result = runner.invoke(main, args, catch_exceptions=False)
+def run(runner, args, exit_code=0, output="Package created", input=None, catch_exceptions=False):
+    result = runner.invoke(main, args, catch_exceptions=catch_exceptions, input=input)
     assert result.exit_code == exit_code, f"Expected exit code {exit_code}, got {result.exit_code} with output: {result.output}"
     if output:
         assert output in result.output
@@ -137,6 +136,29 @@ SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
 SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s verified
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s.tsr verified\
 """)
+    
+def test_signatures_encrypted_key(runner, tmp_path, test_files, root_ca):
+    bag_path = tmp_path / 'bag'
+    run(runner, [
+        'archive',
+        str(bag_path),
+        '-p', str(test_files["payload"][0]),
+        '-s', 'tests/fixtures/pki/domain-chain.pem:tests/fixtures/pki/domain-signing-enc.key',
+    ], input='password\n')
+    assert validate_passing(bag_path) == snapshot("""\
+WARNING: No headers.warc found; archive lacks request and response metadata
+SUCCESS: bag format is valid
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
+WARNING: No timestamps found\
+""")
+    
+    # with wrong password, should fail
+    run(runner, [
+        'archive',
+        str(tmp_path / 'bag2'),
+        '-p', str(test_files["payload"][0]),
+        '-s', 'tests/fixtures/pki/domain-chain.pem:tests/fixtures/pki/domain-signing-enc.key',
+    ], catch_exceptions=True, exit_code=1, input='wrong\n', output='maybe wrong password')
 
 def test_just_timestamp_no_signatures(runner, tmp_path, test_files, root_ca):
     bag_path = tmp_path / 'bag'

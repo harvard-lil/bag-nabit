@@ -29,20 +29,26 @@ KNOWN_TSAS = {
     },
 }
 
-def run_openssl(args: list[str | Path]) -> subprocess.CompletedProcess:
+def run_openssl(args: list[str | Path], env: dict = None) -> subprocess.CompletedProcess:
     """Run openssl subprocess and handle errors."""
     command = ["openssl"] + args
     try:
         result = subprocess.run(
             command,
             capture_output=True,
-            check=True
+            check=True,
+            env=env
         )
         return result
     except subprocess.CalledProcessError as e:
         command_str = ' '.join(str(arg) for arg in command)
         print(f"OpenSSL error: {command_str}\n{e.stderr}", file=sys.stderr)
         raise
+
+def is_encrypted_key(key_path: Path | str) -> bool:
+    """Check if a private key is encrypted."""
+    contents = Path(key_path).read_text()
+    return any(s in contents for s in ["ENCRYPTED PRIVATE KEY", "Proc-Type: 4,ENCRYPTED"])
 
 def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> None:
     """
@@ -90,7 +96,7 @@ def verify_timestamp(timestamp_file: Path, file_to_verify: Path, pem_file: Path)
         "-CAfile", pem_file,
     ])
 
-def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path) -> None:
+def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path, password: str | None = None) -> None:
     """Create a detached signature with full chain in PEM format."""
     # Validate the certificate chain is in PEM format
     try:
@@ -140,10 +146,15 @@ def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path) -> None
             # in order to make the signature comply with the requirements for a CAdES Basic Electronic Signature (CAdES-BES)."
             "-cades",
         ]
+        env = None
         if include_chain:
             args.extend(["-certfile", cert_chain_file.name])
-
-        return run_openssl(args)
+        if password is not None:
+            env = os.environ.copy()
+            env['OPENSSL_PASS'] = password
+            args.extend(["-passin", "env:OPENSSL_PASS"])
+        
+        return run_openssl(args, env=env)
     
 
 def verify_signature(signature_file: Path, file_to_verify: Path) -> None:
