@@ -161,7 +161,7 @@ def validate_warc_headers(headers_path: Path, error, warn, success) -> None:
                 profile = record.rec_headers.get_header('WARC-Profile')
                 if profile.startswith('file-content'):  # pragma: no branch
                     # extract file path from header 'file-content; filename="..."'
-                    file_path = profile.split(';')[1].split('=')[1].strip('"')
+                    file_path = profile.split(';')[1].split('=', 1)[1].strip('"')
                     # normalize path to prevent directory traversal attacks
                     safe_path = os.path.normpath('/'+file_path).lstrip('/')
                     full_path = data_path / safe_path
