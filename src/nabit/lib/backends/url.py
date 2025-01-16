@@ -62,7 +62,11 @@ class UrlCollectionTask(CollectionTask):
             warc_writer = FileWriter(fh, warc_path, gzip=False, content_type_overrides=self.content_type_overrides)
             with capture_http(warc_writer):
                 warc_writer.custom_out_path = self.output
-                requests.get(self.url, timeout=self.timeout)
+                response = requests.get(self.url, timeout=self.timeout, stream=True)
+                # consume the streaming response so capture_http writes it
+                # see https://github.com/webrecorder/warcio/issues/187 for whether this is necessary
+                for _ in response.iter_content(chunk_size=2**16):
+                    pass
         return {'path': str(warc_writer.result_path)}
     
     def request_dict(self) -> dict:
