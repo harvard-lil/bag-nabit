@@ -532,3 +532,30 @@ def test_collect_errors_ignore(runner, tmp_path, monkeypatch):
   }
 ]\
 """)
+
+def test_sign(runner, test_bag, root_ca):
+    run(runner, [
+        'sign',
+        str(test_bag),
+        '-s', 'tests/fixtures/pki/domain-chain.pem:tests/fixtures/pki/domain-signing.key',
+        '-s', 'tests/fixtures/pki/email-chain.pem:tests/fixtures/pki/email-signing.key',
+        '-t', 'digicert'
+    ], output="signed at")
+    assert validate_passing(test_bag) == snapshot("""\
+WARNING: No headers.warc found; archive lacks request and response metadata
+SUCCESS: bag format is valid
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s verified
+SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s.tsr verified\
+""")
+
+def test_sign_invalid_bag(runner, test_bag, root_ca):
+    (test_bag / 'tagmanifest-sha256.txt').unlink()
+
+    run(runner, [
+        'sign',
+        str(test_bag),
+        '-s', 'tests/fixtures/pki/domain-chain.pem:tests/fixtures/pki/domain-signing.key',
+        '-s', 'tests/fixtures/pki/email-chain.pem:tests/fixtures/pki/email-signing.key',
+        '-t', 'digicert'
+    ], catch_exceptions=True, exit_code=1, output="Error: bag format is invalid: No tagmanifest-sha256.txt found")

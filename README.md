@@ -119,6 +119,7 @@ Options:
 
 Commands:
   archive   Archive files and URLs into a BagIt package.
+  sign      Sign an existing bag.
   validate  Validate a BagIt package.
 ```
 
@@ -161,6 +162,22 @@ Options:
   --timeout FLOAT                 Timeout for collection tasks (default: 5.0)
   --collect-errors [fail|ignore]  How to handle collection task errors
                                   (default: fail)
+  --help                          Show this message and exit.
+```
+
+### sign
+```
+Usage:  [OPTIONS] BAG_PATH
+
+  Sign an existing bag.
+
+Options:
+  -s, --sign <cert_chain>:<key_file>
+                                  Sign using certificate chain and private key
+                                  files (can be repeated)
+  -t, --timestamp <tsa_keyword> | <cert_chain>:<url>
+                                  Timestamp using either a TSA keyword or a
+                                  cert chain path and URL (can be repeated)
   --help                          Show this message and exit.
 ```
 

@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 from .utils import assert_file_exists, assert_url, cli_validate, CaptureCommand
-from ..lib.archive import package
-from ..lib.sign import KNOWN_TSAS, is_encrypted_key
+from ..lib.archive import package, validate_package
+from ..lib.sign import KNOWN_TSAS, is_encrypted_key, add_signatures
 from ..lib.backends.base import CollectionTask, CollectionError
 from ..lib.backends.path import PathCollectionTask
 
@@ -152,9 +152,76 @@ def archive(
             if isinstance(task, PathCollectionTask):
                 task.hard_links = True
 
+    signatures = _get_signatures(ctx.raw_args, signature_args)
+
+    click.echo(f"Creating package at {bag_path} ...")
+
+    try:
+        package(
+            output_path=bag_path,
+            collect=processed_collect,
+            bag_info=bag_info,
+            signatures=signatures,
+            signed_metadata=metadata['signed'],
+            unsigned_metadata=metadata['unsigned'],
+            amend=amend,
+            collect_errors=collect_errors,
+        )
+    except CollectionError as e:
+        raise click.BadParameter(f'Collection task failed: {e}')
+
+    cli_validate(bag_path)
+    
+    click.echo(f"Package {'amended' if amend else 'created'} at {bag_path}")
+
+@main.command()
+@click.argument('bag_path', type=click.Path(exists=True, path_type=Path))
+def validate(bag_path):
+    """
+    Validate a BagIt package.
+    bag_path is the path to the package directory to validate.
+    """
+    cli_validate(bag_path)
+
+@main.command(cls=CaptureCommand)
+@click.argument('bag_path', type=click.Path(path_type=Path))
+@click.option('--sign', '-s', 'signature_args', multiple=True,
+            help='Sign using certificate chain and private key files (can be repeated)',
+            metavar='<cert_chain>:<key_file>',
+            )
+@click.option('--timestamp', '-t', 'signature_args', multiple=True,
+            help='Timestamp using either a TSA keyword or a cert chain path and URL (can be repeated)',
+            metavar='<tsa_keyword> | <cert_chain>:<url>',
+            )
+@click.pass_context
+def sign(
+    ctx,
+    bag_path,
+    signature_args
+):
+    """
+    Sign an existing bag.
+    """
+
+    def print_error(e):
+        raise click.ClickException(e)
+
+    # ensure we are starting with a bag
+    validate_package(bag_path, error=print_error)
+
+    signatures = _get_signatures(ctx.raw_args, signature_args)
+
+    for tagmanifest in bag_path.glob("tagmanifest-*.txt"):
+        add_signatures(tagmanifest, bag_path / "signatures", signatures)
+
+    cli_validate(bag_path)
+    
+    click.echo(f"Package signed at {bag_path}")
+
+def _get_signatures(raw_args, signature_args):
     ## handle --sign and --timestamp options
     # order matters, so get ordered list of signature flags from sys.argv
-    signature_flags = [arg for arg in ctx.raw_args if arg in ['-s', '--sign', '-t', '--timestamp']]
+    signature_flags = [arg for arg in raw_args if arg in ['-s', '--sign', '-t', '--timestamp']]
     # process each signature flag
     signatures = []
     for kind, value in zip(signature_flags, signature_args):
@@ -188,31 +255,4 @@ def archive(
                 params = {'url': url, 'cert_chain': cert_chain}
             signatures.append({'action': 'timestamp', 'params': params})
 
-    click.echo(f"Creating package at {bag_path} ...")
-
-    try:
-        package(
-            output_path=bag_path,
-        collect=processed_collect,
-        bag_info=bag_info,
-        signatures=signatures,
-        signed_metadata=metadata['signed'],
-        unsigned_metadata=metadata['unsigned'],
-        amend=amend,
-            collect_errors=collect_errors,
-        )
-    except CollectionError as e:
-        raise click.BadParameter(f'Collection task failed: {e}')
-
-    cli_validate(bag_path)
-    
-    click.echo(f"Package {'amended' if amend else 'created'} at {bag_path}")
-
-@main.command()
-@click.argument('bag_path', type=click.Path(exists=True, path_type=Path))
-def validate(bag_path):
-    """
-    Validate a BagIt package.
-    bag_path is the path to the package directory to validate.
-    """
-    cli_validate(bag_path)
+    return signatures
