@@ -19,11 +19,8 @@ def test_ds_store_ignored(tmp_path):
     assert filter_str(response, path=tmp_path) == snapshot("""\
 {
   "request": {
-    "path": "<path>/test_dir",
-    "output": null,
-    "hard_links": false,
     "ignore_patterns": [
-      ".DS_Store"
+      ".*"
     ]
   },
   "response": {
@@ -57,11 +54,8 @@ def test_output_parameter(tmp_path):
     assert filter_str(response, path=tmp_path) == snapshot("""\
 {
   "request": {
-    "path": "<path>/test_dir",
-    "output": "custom_name",
-    "hard_links": false,
     "ignore_patterns": [
-      ".DS_Store"
+      ".*"
     ]
   },
   "response": {

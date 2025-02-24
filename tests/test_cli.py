@@ -543,11 +543,8 @@ def test_collect_errors_ignore(runner, tmp_path, monkeypatch):
 [
   {
     "request": {
-      "path": "<path>",
-      "output": null,
-      "hard_links": false,
       "ignore_patterns": [
-        ".DS_Store"
+        ".*"
       ]
     },
     "response": {

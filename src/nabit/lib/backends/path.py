@@ -14,7 +14,7 @@ class PathCollectionTask(CollectionTask):
     output: Path | None = None
     hard_links: bool = False
 
-    ignore_patterns = ['.DS_Store']
+    ignore_patterns = ['.*']
 
     def __post_init__(self):
         """Validate the path and ensure it's a Path object."""
@@ -51,8 +51,5 @@ class PathCollectionTask(CollectionTask):
     def request_dict(self) -> dict:
         """Return a dictionary representation of the request."""
         return {
-            'path': str(self.path),
-            'output': str(self.output) if self.output else None,
-            'hard_links': self.hard_links,
             'ignore_patterns': self.ignore_patterns,
         }

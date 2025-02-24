@@ -242,6 +242,7 @@ Currently supported collection backends are:
 * `path`: copy local files or directories to the bag. Equivalent to the `-p` flag to `nabit archive`. Keys:
   * `path`: the path to the local file or directory to copy
   * `output` (optional): the path to save the fetched content to in the bag.
+  * `ignore_patterns` (optional): a list of glob patterns to ignore when copying the file or directory. Defaults to `['.*']`.
 
 Future backends could include ftp, web crawlers, etc.
 
