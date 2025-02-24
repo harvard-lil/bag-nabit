@@ -85,8 +85,6 @@ def package(
     # add data files
     output_path = Path(output_path)
     data_path = output_path / 'data'
-    files_path = data_path / 'files'
-    files_path.mkdir(exist_ok=True, parents=True)
     signed_metadata_path = data_path / "signed-metadata.json"
 
     # set or extend signed metadata
@@ -96,11 +94,13 @@ def package(
         else:
             signed_metadata = {}
     
-    if not signed_metadata.get('id'):
+    if not amend and not signed_metadata.get('id'):
         signed_metadata['id'] = str(uuid.uuid4())
 
     # run collection tasks and record results
     if collect:
+        files_path = data_path / 'files'
+        files_path.mkdir(exist_ok=True, parents=True)
         results = []
         for task in collect:
             result = task.collect(files_path)
@@ -111,6 +111,7 @@ def package(
 
     # Add metadata files
     if signed_metadata:
+        data_path.mkdir(exist_ok=True, parents=True)
         (data_path / "signed-metadata.json").write_text(json.dumps(signed_metadata, indent=2))
     if unsigned_metadata:
         (output_path / "unsigned-metadata.json").write_text(json.dumps(unsigned_metadata, indent=2))

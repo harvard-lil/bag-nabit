@@ -5,6 +5,7 @@ from inline_snapshot import snapshot
 import json
 import re
 import pytest
+import bagit
 from .utils import validate_passing, validate_failing, filter_str
 
 ### helpers
@@ -222,6 +223,30 @@ WARNING: No signatures found
 WARNING: No timestamps found\
 """)
     assert list(bag_path.glob('signatures/*')) == []
+
+def test_bagit_then_sign(runner, tmp_path, root_ca):
+    # create bag with bagit
+    test_file = tmp_path / "payload.txt"
+    test_file.write_text("test")
+    bagit.make_bag(tmp_path)
+
+    # sign the bag
+    run(runner, [
+        'archive',
+        '--amend',
+        str(tmp_path),
+        '-s', 'tests/fixtures/pki/domain-chain.pem:tests/fixtures/pki/domain-signing.key',
+        '-t', 'digicert'
+    ], output='Package amended')
+
+    assert validate_passing(tmp_path) == snapshot("""\
+WARNING: No headers.warc found; archive lacks request and response metadata
+WARNING: No files in data/files
+WARNING: 1 unexpected files in data/, starting with payload.txt.
+SUCCESS: bag format is valid
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
+SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr verified\
+""")
 
 def test_recreate_tag_files(runner, tmp_path, test_files, root_ca):
     bag_path = tmp_path / 'bag'
