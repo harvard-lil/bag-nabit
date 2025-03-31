@@ -14,6 +14,8 @@ from either local files or remote URLs, and can also:
 * Attach timestamps and public-key signatures to the bag's tagmanifest file.
 * Verify format compliance and provenance chains on an existing bag-nabit bag.
 
+`bag-nabit` can also be used to sign bags created with other tools and digital preservation workflows.
+
 Design goals
 ------------
 
@@ -98,6 +100,12 @@ Amend an existing bag to add files, metadata, signatures, and/or timestamps (edi
 
 ```
 nabit archive example_bag --amend -u https://example.com/another -i "Subtitle: Another Header" -s mykey.pem:mychain.pem -t digicert
+```
+
+Sign an existing bag (even bags not created with nabit as long at they have a tagmanifest):
+
+```
+nabit archive example_bag --amend -s mykey.pem:mychain.pem -t digicert
 ```
 
 Validate a bag's contents:
