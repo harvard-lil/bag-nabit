@@ -31,19 +31,30 @@ KNOWN_TSAS = {
 
 def run_openssl(args: list[str | Path], env: dict = None) -> subprocess.CompletedProcess:
     """Run openssl subprocess and handle errors."""
-    command = ["openssl"] + args
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            check=True,
-            env=env
+    command = ["openssl"] + [str(a) for a in args]
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        pid = os.posix_spawnp(
+            command[0], command,
+            env if env is not None else os.environ,
+            file_actions=[
+                (os.POSIX_SPAWN_DUP2, out.fileno(), 1),
+                (os.POSIX_SPAWN_DUP2, err.fileno(), 2),
+            ],
         )
-        return result
-    except subprocess.CalledProcessError as e:
+        _, status = os.waitpid(pid, 0)
+        out.seek(0)
+        err.seek(0)
+        stdout, stderr = out.read(), err.read()
+
+    returncode = os.WEXITSTATUS(status) if os.WIFEXITED(status) else -os.WTERMSIG(status)
+    result = subprocess.CompletedProcess(command, returncode, stdout, stderr)
+
+    if returncode != 0:
         command_str = ' '.join(str(arg) for arg in command)
-        print(f"OpenSSL error: {command_str}\n{e.stderr}", file=sys.stderr)
-        raise
+        print(f"OpenSSL error: {command_str}\n{stderr}", file=sys.stderr)
+        raise subprocess.CalledProcessError(returncode, command, output=stdout, stderr=stderr)
+
+    return result
 
 def is_encrypted_key(key_path: Path | str) -> bool:
     """Check if a private key is encrypted."""
@@ -66,15 +77,15 @@ def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> No
             "-cert",
             "-out", tsq.name
         ])
-        
+
         # read timestamp query file
         tsq_data = tsq.read()
-        
+
         # send request to TSA using requests
         headers = {'Content-Type': 'application/timestamp-query'}
         response = requests.post(url, headers=headers, data=tsq_data)
         response.raise_for_status()
-        
+
         # write the timestamp response
         output_path.write_bytes(response.content)
 
@@ -127,7 +138,7 @@ def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path, passwor
             include_chain = True
             Path(cert_chain_file.name).write_text(remaining_chain)
             cert_chain_file.flush()
-        
+
         args = [
             "cms",
             "-sign",
@@ -153,9 +164,9 @@ def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path, passwor
             env = os.environ.copy()
             env['OPENSSL_PASS'] = password
             args.extend(["-passin", "env:OPENSSL_PASS"])
-        
+
         return run_openssl(args, env=env)
-    
+
 
 def verify_signature(signature_file: Path, file_to_verify: Path) -> None:
     """Verify a detached signature."""
