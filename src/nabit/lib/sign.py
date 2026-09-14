@@ -31,10 +31,11 @@ KNOWN_TSAS = {
 
 def run_openssl(args: list[str | Path], env: dict = None) -> subprocess.CompletedProcess:
     """Run openssl subprocess and handle errors."""
-    command = ["openssl"] + [str(a) for a in args]
+    command = ["openssl"] + args
+    spawn_command = [str(a) for a in command]
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         pid = os.posix_spawnp(
-            command[0], command,
+            spawn_command[0], spawn_command,
             env if env is not None else os.environ,
             file_actions=[
                 (os.POSIX_SPAWN_DUP2, out.fileno(), 1),
