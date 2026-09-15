@@ -26,5 +26,8 @@ jobs:
       with:
         enable-cache: true
 
+    - name: SSL Debug
+      run: openssl version -d && ls /etc/ssl/certs | grep -i digicert
+      
     - name: Run tests
       run: uv run --python ${{ matrix.python-version }} --frozen pytest
