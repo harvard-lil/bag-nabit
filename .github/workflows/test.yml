@@ -28,6 +28,14 @@ jobs:
 
     - name: SSL Debug
       run: openssl version -d && ls /etc/ssl/certs | grep -i digicert
+
+    - name: Check ca-certificates package
+      run: |
+        apt list --installed 2>/dev/null | grep ca-certificates
+        apt-cache policy ca-certificates
+        echo "--- checking for the specific root ---"
+        ls /etc/ssl/certs | grep -i "digicert assured" || echo "not found by filename"
+        grep -rl "DigiCert Assured ID Root CA" /etc/ssl/certs/*.pem 2>/dev/null || echo "not found by CN"
       
     - name: Run tests
       run: uv run --python ${{ matrix.python-version }} --frozen pytest
