@@ -95,9 +95,10 @@ def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> No
 
 def verify_timestamp(timestamp_file: Path, file_to_verify: Path, pem_file: Path) -> None:
     """Verify a timestamp for a file."""
-    # first verify the timestamp certificate is trusted by this system
-    # note: this will fail if a bag is timestamped by a root CA later taken out of service
-    run_openssl(['verify', pem_file])
+    # first verify the timestamp certificate against the known-good root bundled with this
+    # TSA config (see KNOWN_TSAS), rather than the system's ambient trust store — the
+    # latter drifts across OS/CI environments as CAs prune legacy roots
+    run_openssl(['verify', '-CAfile', pem_file, pem_file])
 
     # now verify the timestamp response with the valid timestamp certificate
     return run_openssl([
