@@ -19,6 +19,8 @@ def _validate(bag_path: Path):
     )
     out = "\n".join(responses)
     out = out.replace(str(bag_path), "<bag_path>")
+    # signatures are checked as of their timestamp, which is set by the live TSA
+    out = re.sub(r"'-attime', '\d+'", "'-attime', '<timestamp>'", out)
     return out
 
 def validate_failing(bag_path: Path):

@@ -316,6 +316,10 @@ The signatures directory can contain two kinds of attestation files:
     ```
     openssl cms -verify -binary -content <original_file> -in <signature_file> -inform PEM -purpose any
     ```
+  * Signing certificates expire, typically after a year. If a later `.tsr` file in the chain timestamps
+    the signature, check the certificate as of the timestamp's time instead of the current time,
+    by adding `-attime <unix_time>`. The time is shown by
+    `openssl ts -reply -in <timestamp_file> -text`. `nabit validate` does this automatically.
 * `.tsr` files are timestamp response files, which assert a time before which the bag was created.
   * `.tsr` files are created with the command:
     ```

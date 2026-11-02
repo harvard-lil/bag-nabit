@@ -26,7 +26,7 @@ def test_valid_signed_package(signed_bag):
     assert validate_passing(signed_bag) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
 SUCCESS: bag format is valid
-SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified as of timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr verified\
 """)
 
@@ -45,7 +45,7 @@ def test_extra_payload(test_bag):
     (test_bag / "data/files/extra.txt").write_text("extra payload")
     assert validate_failing(test_bag) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: data/files/extra.txt exists on filesystem but is not in the manifest
+ERROR: bag format is invalid: Bag is incomplete: data/files/extra.txt exists on filesystem but is not in the manifest
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -56,7 +56,7 @@ def test_missing_warc_file(warc_bag):
 SUCCESS: headers.warc found
 ERROR: headers.warc specifies files that do not exist in data/files. Example: files/localhost.html
 WARNING: No files in data/files
-ERROR: bag format is invalid: Bag validation failed: data/files/localhost.html exists in manifest but was not found on filesystem
+ERROR: bag format is invalid: Bag is incomplete: data/files/localhost.html exists in manifest but was not found on filesystem
 WARNING: Cannot verify the validity of empty directories: <bag_path>/data/files
 WARNING: No signatures found
 WARNING: No timestamps found\
@@ -67,7 +67,7 @@ def test_extra_warc_file(warc_bag):
     assert validate_failing(warc_bag) == snapshot("""\
 SUCCESS: headers.warc found
 WARNING: Some files in data/files are not specified in headers.warc. Example: <bag_path>/data/files/extra.html
-ERROR: bag format is invalid: Bag validation failed: data/files/extra.html exists on filesystem but is not in the manifest
+ERROR: bag format is invalid: Bag is incomplete: data/files/extra.html exists on filesystem but is not in the manifest
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -92,7 +92,7 @@ def test_extra_data(test_bag):
     assert validate_failing(test_bag) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
 WARNING: 1 unexpected files in data/, starting with extra.txt.
-ERROR: bag format is invalid: Bag validation failed: data/extra.txt exists on filesystem but is not in the manifest
+ERROR: bag format is invalid: Bag is incomplete: data/extra.txt exists on filesystem but is not in the manifest
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -122,7 +122,7 @@ def test_unsigned_metadata_modified(signed_bag):
     assert validate_passing(signed_bag) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
 SUCCESS: bag format is valid
-SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified as of timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr verified\
 """)
 
@@ -154,7 +154,7 @@ def test_missing_bag_info(test_bag):
     (test_bag / "bag-info.txt").unlink()
     assert validate_failing(test_bag) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: bag-info.txt exists in manifest but was not found on filesystem
+ERROR: bag format is invalid: Bag is incomplete: bag-info.txt exists in manifest but was not found on filesystem
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
@@ -240,7 +240,7 @@ WARNING: No timestamps found\
     assert validate_failing(signed_bag) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
 SUCCESS: bag format is valid
-ERROR: Signature verification failed: Command '['openssl', 'cms', '-verify', '-binary', '-content', PosixPath('<bag_path>/tagmanifest-sha256.txt'), '-in', PosixPath('<bag_path>/signatures/tagmanifest-sha256.txt.p7s'), '-inform', 'PEM', '-purpose', 'any', '-CAfile', 'tests/fixtures/pki/root-ca.crt']' returned non-zero exit status 4.
+ERROR: Signature verification failed: Command '['openssl', 'cms', '-verify', '-binary', '-content', PosixPath('<bag_path>/tagmanifest-sha256.txt'), '-in', PosixPath('<bag_path>/signatures/tagmanifest-sha256.txt.p7s'), '-inform', 'PEM', '-purpose', 'any', '-CAfile', 'tests/fixtures/pki/root-ca.crt', '-attime', '<timestamp>']' returned non-zero exit status 4.
 WARNING: Unknown signature file: <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr
 WARNING: Unknown signature file: <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr.crt
 WARNING: No signatures found
