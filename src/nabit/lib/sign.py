@@ -1,10 +1,12 @@
+from datetime import datetime, timezone
+from importlib.resources import files
 from pathlib import Path
+import re
 import requests
 import subprocess
 import tempfile
 import sys
 import os
-import pkg_resources
 
 from .utils import noop
 
@@ -12,13 +14,16 @@ from .utils import noop
 ROOT_CA = os.environ.get("ROOT_CA")
 
 # Add this constant near the top of the file, after imports
-CERT_DIR = Path(pkg_resources.resource_filename('nabit', 'certs'))
+CERT_DIR = Path(str(files('nabit') / 'certs'))
 
 # Modify KNOWN_TSAS to reference local cert files
 KNOWN_TSAS = {
     "digicert": {
         "url": "http://timestamp.digicert.com",
-        # downloaded from https://cacerts.digicert.com/DigiCertAssuredIDRootCA.crt.pem
+        # DigiCert Trusted Root G4, the root of DigiCert's timestamping chain, from
+        # https://cacerts.digicert.com/DigiCertTrustedRootG4.crt.pem .
+        # Bags timestamped before 2026 include DigiCert Assured ID Root CA instead,
+        # which has since been removed from Mozilla's trust store.
         "cert_chain": str(CERT_DIR / "digicert.crt"),
     },
     "sectigo": {
@@ -82,19 +87,69 @@ def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> No
         output_path.with_suffix('.tsr.crt').write_bytes(Path(cert_chain).read_bytes())
 
 def verify_timestamp(timestamp_file: Path, file_to_verify: Path, pem_file: Path) -> None:
-    """Verify a timestamp for a file."""
-    # first verify the timestamp certificate is trusted by this system
-    # note: this will fail if a bag is timestamped by a root CA later taken out of service
-    run_openssl(['verify', pem_file])
+    """
+    Verify a timestamp for a file.
 
-    # now verify the timestamp response with the valid timestamp certificate
-    return run_openssl([
-        "ts",
-        "-verify",
-        "-data", file_to_verify,
-        "-in", timestamp_file,
-        "-CAfile", pem_file,
-    ])
+    The timestamp is checked against the certificate stored with it (`pem_file`).
+    If this system no longer trusts that certificate, for example because its root CA
+    was removed from trust stores, the known TSA roots shipped with nabit are tried instead.
+    A root is only used if this system trusts it.
+    """
+    candidates = [pem_file] + [Path(tsa["cert_chain"]) for tsa in KNOWN_TSAS.values()]
+    untrusted_errors = []
+    timestamp_errors = []
+    for ca_file in candidates:
+        try:
+            # verify the timestamp certificate is trusted by this system
+            run_openssl(['verify', ca_file])
+        except subprocess.CalledProcessError as e:
+            untrusted_errors.append(e)
+            continue
+        try:
+            # verify the timestamp response with the trusted timestamp certificate
+            return run_openssl([
+                "ts",
+                "-verify",
+                "-data", file_to_verify,
+                "-in", timestamp_file,
+                "-CAfile", ca_file,
+            ])
+        except subprocess.CalledProcessError as e:
+            timestamp_errors.append(e)
+    # prefer reporting a bad timestamp over a root this system doesn't trust
+    raise (timestamp_errors + untrusted_errors)[0]
+
+def timestamp_time(timestamp_file: Path) -> datetime:
+    """Return the time attested by a timestamp response."""
+    result = run_openssl(["ts", "-reply", "-in", timestamp_file, "-text"])
+    # openssl prints e.g. "Time stamp: Feb  6 15:54:02 2025 GMT", with optional fractional seconds
+    match = re.search(r"^Time stamp: (\w+) +(\d+) (\d+:\d+:\d+)(?:\.\d+)? (\d+) GMT$", result.stdout.decode(), re.M)
+    if not match:
+        raise ValueError(f"Could not read time from timestamp response {timestamp_file}")
+    month, day, clock, year = match.groups()
+    return datetime.strptime(f"{month} {day} {clock} {year}", "%b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
+
+def covering_timestamp_time(signature_file: Path) -> tuple[Path, datetime] | tuple[None, None]:
+    """
+    Find the nearest valid timestamp later in the chain than `signature_file`,
+    and return it with the time it attests. The signature must have existed by then,
+    so its certificate should be checked as of that time rather than the current time.
+    """
+    candidates = sorted(
+        (f for f in signature_file.parent.iterdir()
+         if f.name.startswith(signature_file.name + ".") and f.name.endswith(".tsr")),
+        key=lambda f: len(f.name),
+    )
+    for timestamp_file in candidates:
+        pem_file = timestamp_file.with_suffix(timestamp_file.suffix + '.crt')
+        if not pem_file.exists():
+            continue
+        try:
+            verify_timestamp(timestamp_file, timestamp_file.with_suffix(''), pem_file)
+            return timestamp_file, timestamp_time(timestamp_file)
+        except (subprocess.CalledProcessError, ValueError):
+            continue
+    return None, None
 
 def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path, password: str | None = None) -> None:
     """Create a detached signature with full chain in PEM format."""
@@ -157,8 +212,12 @@ def sign(file_path: Path, output_path: Path, key: str, cert_chain: Path, passwor
         return run_openssl(args, env=env)
     
 
-def verify_signature(signature_file: Path, file_to_verify: Path) -> None:
-    """Verify a detached signature."""
+def verify_signature(signature_file: Path, file_to_verify: Path, at_time: datetime | None = None) -> None:
+    """
+    Verify a detached signature.
+    If `at_time` is given, check the signing certificate as of that time
+    instead of the current time.
+    """
     args =[
         "cms",
         "-verify",
@@ -170,6 +229,8 @@ def verify_signature(signature_file: Path, file_to_verify: Path) -> None:
     ]
     if ROOT_CA:  # pragma: no branch
         args.extend(["-CAfile", ROOT_CA])
+    if at_time is not None:
+        args.extend(["-attime", str(int(at_time.timestamp()))])
     return run_openssl(args)
 
 def add_signatures(file_to_sign: Path, signatures_path: Path, signatures: list[dict]) -> None:
@@ -244,8 +305,14 @@ def validate_signatures(file_to_verify: Path, error=noop, warn=noop, success=noo
         try:
             # handle signature files ending in .p7s
             if signature_file.name == file_to_verify.name + ".p7s":
-                verify_signature(signature_file, file_to_verify)
-                success(f"signature {signature_file} verified", metadata={"file": signature_file})
+                # check the certificate as of a trusted timestamp if there is one,
+                # so signatures stay valid after the signing certificate expires
+                timestamp_file, at_time = covering_timestamp_time(signature_file)
+                verify_signature(signature_file, file_to_verify, at_time)
+                if timestamp_file:
+                    success(f"signature {signature_file} verified as of timestamp {timestamp_file}", metadata={"file": signature_file, "timestamp_file": timestamp_file, "at_time": at_time})
+                else:
+                    success(f"signature {signature_file} verified", metadata={"file": signature_file})
                 file_to_verify = signature_file
                 has_signatures = True
             # handle timestamp response files ending in .tsr

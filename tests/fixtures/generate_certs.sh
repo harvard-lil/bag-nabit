@@ -11,7 +11,7 @@ openssl ecparam -name prime256v1 -genkey -noout -out tests/fixtures/pki/root-ca.
 # Create self-signed root certificate
 openssl req -x509 -new -nodes \
   -key tests/fixtures/pki/root-ca.key \
-  -sha256 -days 3650 \
+  -sha256 -days 36500 \
   -out tests/fixtures/pki/root-ca.crt \
   -subj "/CN=Test Root CA/O=Data Vault tests/C=US"
 
@@ -31,7 +31,7 @@ openssl x509 -req \
   -CAkey tests/fixtures/pki/root-ca.key \
   -CAcreateserial \
   -out tests/fixtures/pki/intermediate-ca.crt \
-  -days 1825 \
+  -days 36500 \
   -sha256 \
   -extensions v3_ca \
   -extfile <(echo "[v3_ca]
@@ -57,7 +57,7 @@ openssl x509 -req \
   -CAkey tests/fixtures/pki/intermediate-ca.key \
   -CAcreateserial \
   -out tests/fixtures/pki/domain-signing.crt \
-  -days 365 \
+  -days 36500 \
   -sha256 \
   -extensions v3_domain \
   -extfile <(echo "[v3_domain]
@@ -82,7 +82,7 @@ openssl x509 -req \
   -CAkey tests/fixtures/pki/intermediate-ca.key \
   -CAcreateserial \
   -out tests/fixtures/pki/email-signing.crt \
-  -days 365 \
+  -days 36500 \
   -sha256 \
   -extensions v3_email \
   -extfile <(echo "[v3_email]

@@ -133,8 +133,8 @@ def test_signatures(runner, tmp_path, test_files, root_ca):
     assert validate_passing(bag_path) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
 SUCCESS: bag format is valid
-SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
-SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s verified
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified as of timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s.tsr
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s verified as of timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s.tsr
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.p7s.tsr verified\
 """)
     
@@ -205,7 +205,7 @@ WARNING: No signatures found\
 WARNING: No headers.warc found; archive lacks request and response metadata
 SUCCESS: bag format is valid
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.tsr verified
-SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.tsr.p7s verified
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.tsr.p7s verified as of timestamp <bag_path>/signatures/tagmanifest-sha256.txt.tsr.p7s.tsr
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.tsr.p7s.tsr verified\
 """)
     
@@ -244,7 +244,7 @@ WARNING: No headers.warc found; archive lacks request and response metadata
 WARNING: No files in data/files
 WARNING: 1 unexpected files in data/, starting with payload.txt.
 SUCCESS: bag format is valid
-SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified
+SUCCESS: signature <bag_path>/signatures/tagmanifest-sha256.txt.p7s verified as of timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr
 SUCCESS: Timestamp <bag_path>/signatures/tagmanifest-sha256.txt.p7s.tsr verified\
 """)
 
@@ -266,7 +266,7 @@ WARNING: No timestamps found\
     (bag_path / 'data/files/extra.txt').write_text('extra file')
     assert validate_failing(bag_path) == snapshot("""\
 WARNING: No headers.warc found; archive lacks request and response metadata
-ERROR: bag format is invalid: Bag validation failed: data/files/extra.txt exists on filesystem but is not in the manifest
+ERROR: bag format is invalid: Bag is incomplete: data/files/extra.txt exists on filesystem but is not in the manifest
 WARNING: No signatures found
 WARNING: No timestamps found\
 """)
