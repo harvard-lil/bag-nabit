@@ -20,7 +20,10 @@ CERT_DIR = Path(str(files('nabit') / 'certs'))
 KNOWN_TSAS = {
     "digicert": {
         "url": "http://timestamp.digicert.com",
-        # downloaded from https://cacerts.digicert.com/DigiCertAssuredIDRootCA.crt.pem
+        # DigiCert Trusted Root G4, the root of DigiCert's timestamping chain, from
+        # https://cacerts.digicert.com/DigiCertTrustedRootG4.crt.pem .
+        # Bags timestamped before 2026 include DigiCert Assured ID Root CA instead,
+        # which has since been removed from Mozilla's trust store.
         "cert_chain": str(CERT_DIR / "digicert.crt"),
     },
     "sectigo": {
@@ -84,19 +87,37 @@ def timestamp(file_path: str, output_path: str, url: str, cert_chain: str) -> No
         output_path.with_suffix('.tsr.crt').write_bytes(Path(cert_chain).read_bytes())
 
 def verify_timestamp(timestamp_file: Path, file_to_verify: Path, pem_file: Path) -> None:
-    """Verify a timestamp for a file."""
-    # first verify the timestamp certificate is trusted by this system
-    # note: this will fail if a bag is timestamped by a root CA later taken out of service
-    run_openssl(['verify', pem_file])
+    """
+    Verify a timestamp for a file.
 
-    # now verify the timestamp response with the valid timestamp certificate
-    return run_openssl([
-        "ts",
-        "-verify",
-        "-data", file_to_verify,
-        "-in", timestamp_file,
-        "-CAfile", pem_file,
-    ])
+    The timestamp is checked against the certificate stored with it (`pem_file`).
+    If this system no longer trusts that certificate, for example because its root CA
+    was removed from trust stores, the known TSA roots shipped with nabit are tried instead.
+    A root is only used if this system trusts it.
+    """
+    candidates = [pem_file] + [Path(tsa["cert_chain"]) for tsa in KNOWN_TSAS.values()]
+    untrusted_errors = []
+    timestamp_errors = []
+    for ca_file in candidates:
+        try:
+            # verify the timestamp certificate is trusted by this system
+            run_openssl(['verify', ca_file])
+        except subprocess.CalledProcessError as e:
+            untrusted_errors.append(e)
+            continue
+        try:
+            # verify the timestamp response with the trusted timestamp certificate
+            return run_openssl([
+                "ts",
+                "-verify",
+                "-data", file_to_verify,
+                "-in", timestamp_file,
+                "-CAfile", ca_file,
+            ])
+        except subprocess.CalledProcessError as e:
+            timestamp_errors.append(e)
+    # prefer reporting a bad timestamp over a root this system doesn't trust
+    raise (timestamp_errors + untrusted_errors)[0]
 
 def timestamp_time(timestamp_file: Path) -> datetime:
     """Return the time attested by a timestamp response."""
